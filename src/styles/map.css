@@ -1,0 +1,29 @@
+/* Map container */
+#map {
+  height: 100%;
+  width: 100%;
+  z-index: 0;
+}
+
+/* Zoom controls */
+.zoom-controls {
+  display: flex;
+  flex-direction: column;
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  overflow: hidden;
+}
+
+.zoom-button {
+  padding: 0.5rem 0.75rem;
+  font-size: 1.125rem;
+  font-weight: 700;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.zoom-button:hover {
+  background-color: rgb(243 244 246);
+}
