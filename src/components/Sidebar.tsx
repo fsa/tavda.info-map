@@ -76,13 +76,13 @@ export default function Sidebar() {
         </div>
 
         <nav className="sidebar-nav">
+          <a href="https://tavda.info" className="home-link">
+            Тавда.инфо
+          </a>
+
           <button className="home-link" onClick={() => mapInstance?.flyToTavda()}>
             Вернуться в Тавду
           </button>
-
-          <a href="https://tavda.info" className="home-link">
-            На главную
-          </a>
 
           <div className="search-wrapper">
             <label className="search-label">Поиск</label>
