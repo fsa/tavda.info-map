@@ -81,7 +81,7 @@ export default function Sidebar() {
           </a>
 
           <button className="home-link" onClick={() => mapInstance?.flyToTavda()}>
-            Вернуться в Тавду
+            Показать Тавду на карте
           </button>
 
           <div className="search-wrapper">
