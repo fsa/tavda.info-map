@@ -80,7 +80,7 @@ export default function Sidebar() {
             Тавда.инфо
           </a>
 
-          <button className="home-link" onClick={() => mapInstance?.flyToTavda()}>
+          <button className="home-link" onClick={() => { mapInstance?.flyToTavda(); setOpen(false); }}>
             Показать Тавду на карте
           </button>
 
