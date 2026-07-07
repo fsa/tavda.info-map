@@ -56,7 +56,10 @@ export default function Sidebar() {
 
       <aside className={sidebarClass}>
         <div className="sidebar-header">
-          <h2 className="sidebar-title">Навигация</h2>
+          <div className="sidebar-brand">
+            <img src="/logo.svg" alt="" className="sidebar-logo" />
+            <h2 className="sidebar-title">Карта Тавды</h2>
+          </div>
           <div className="sidebar-actions">
             <button
               onClick={() => setOpen(false)}
