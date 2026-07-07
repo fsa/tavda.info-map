@@ -116,6 +116,10 @@
   background-color: hsl(142 72% 29% / 0.05);
   color: var(--color-primary);
   text-decoration: none;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
 }
 
 .home-link:hover {

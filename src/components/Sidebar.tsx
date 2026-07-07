@@ -76,6 +76,10 @@ export default function Sidebar() {
         </div>
 
         <nav className="sidebar-nav">
+          <button className="home-link" onClick={() => mapInstance?.flyToTavda()}>
+            Вернуться в Тавду
+          </button>
+
           <a href="https://tavda.info" className="home-link">
             На главную
           </a>

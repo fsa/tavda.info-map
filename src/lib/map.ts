@@ -111,7 +111,11 @@ export function initMap(containerId: string) {
   };
   zoomControl.addTo(map);
 
-  return { map, setActiveLayer, getActiveLayer };
+  function flyToTavda() {
+    map.flyTo([58.0419, 65.273235], 13, { duration: 1.5 });
+  }
+
+  return { map, setActiveLayer, getActiveLayer, flyToTavda };
 }
 
 export type MapInstance = ReturnType<typeof initMap>;
