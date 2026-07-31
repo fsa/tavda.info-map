@@ -59,7 +59,7 @@ export default function Sidebar() {
               </svg>
             </a>
             <img src="/logo.svg" alt="" className="sidebar-logo" />
-            <h2 className="sidebar-title">Карта Тавды</h2>
+            <h2 className="sidebar-title">Тавда</h2>
           </div>
           <div className="sidebar-actions">
             <button
