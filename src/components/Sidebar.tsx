@@ -53,21 +53,29 @@ export default function Sidebar() {
       <aside className={sidebarClass}>
         <div className="sidebar-header">
           <div className="sidebar-brand">
+            <a href="https://tavda.info" className="sidebar-back" aria-label="На Тавда.инфо">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="20" height="20">
+                <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M19 12H5m7-7-7 7 7 7" />
+              </svg>
+            </a>
             <img src="/logo.svg" alt="" className="sidebar-logo" />
             <h2 className="sidebar-title">Карта Тавды</h2>
           </div>
           <div className="sidebar-actions">
             <button
-              onClick={() => setOpen(false)}
-              className="close-btn-desktop"
-              aria-label="Скрыть меню"
+              onClick={() => { mapInstance?.flyToTavda(); setOpen(false); }}
+              className="icon-btn"
+              aria-label="Показать Тавду на карте"
             >
-              ✕
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="20" height="20">
+                <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z" />
+                <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M9 21V12h6v9" />
+              </svg>
             </button>
             <button
               onClick={() => setOpen(false)}
-              className="close-btn-mobile"
-              aria-label="Закрыть меню"
+              className="icon-btn"
+              aria-label="Скрыть меню"
             >
               ✕
             </button>
@@ -75,14 +83,6 @@ export default function Sidebar() {
         </div>
 
         <nav className="sidebar-nav">
-          <a href="https://tavda.info" className="home-link">
-            Тавда.инфо
-          </a>
-
-          <button className="home-link" onClick={() => { mapInstance?.flyToTavda(); setOpen(false); }}>
-            Показать Тавду на карте
-          </button>
-
           <div className="search-wrapper">
             <label className="search-label">Поиск</label>
             <input type="text" placeholder="Поиск" className="search-input" />
