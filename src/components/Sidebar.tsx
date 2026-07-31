@@ -1,11 +1,6 @@
 import { useState, useEffect } from "react";
 import type { MapInstance, MapLayer } from "../lib/map";
-
-const LAYER_NAMES: Record<MapLayer, string> = {
-  osm: "OpenStreetMap",
-  transport: "Транспорт (© Thunderforest)",
-  arcgis: "Спутник (ArcGIS)",
-};
+import { LAYERS } from "../lib/layers";
 
 export default function Sidebar() {
   const [open, setOpen] = useState(false);
@@ -94,16 +89,19 @@ export default function Sidebar() {
           </div>
 
           <div className="layers-section">
-            <p className="layers-label">Слои карты</p>
-            {(Object.keys(LAYER_NAMES) as MapLayer[]).map((key) => (
-              <button
-                key={key}
-                className={`layer-button ${activeLayer === key ? "layer-active" : "layer-inactive"}`}
-                onClick={() => handleLayerChange(key)}
-              >
-                {LAYER_NAMES[key]}
-              </button>
-            ))}
+            <label className="layers-label" htmlFor="layer-select">Слой карты</label>
+            <select
+              id="layer-select"
+              className="layer-select"
+              value={activeLayer}
+              onChange={(e) => handleLayerChange(e.target.value as MapLayer)}
+            >
+              {LAYERS.map((layer) => (
+                <option key={layer.id} value={layer.id}>
+                  {layer.name}
+                </option>
+              ))}
+            </select>
           </div>
         </nav>
       </aside>
