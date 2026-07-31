@@ -4,6 +4,7 @@ import type { MapInstance, MapLayer } from "../lib/map";
 const LAYER_NAMES: Record<MapLayer, string> = {
   osm: "OpenStreetMap",
   transport: "Транспорт (© Thunderforest)",
+  arcgis: "Спутник (ArcGIS)",
 };
 
 export default function Sidebar() {
