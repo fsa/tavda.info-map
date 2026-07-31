@@ -4,6 +4,7 @@ import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
 import { LAYERS, type LayerConfig } from "./layers";
+import { toast } from "./toast";
 
 /** Строковый идентификатор слоя (выводится из LAYERS) */
 export type MapLayer = (typeof LAYERS)[number]["id"];
@@ -97,10 +98,49 @@ export function initMap(containerId: string) {
     return currentLayer;
   }
 
-  // Zoom controls
+  // Geolocation
+  function locateUser() {
+    if (!navigator.geolocation) {
+      toast.error("Геолокация не поддерживается вашим браузером");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        map.flyTo([latitude, longitude], 15, { duration: 1.5 });
+        toast.success(`Вы найдены: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+      },
+      (err) => {
+        switch (err.code) {
+          case err.PERMISSION_DENIED:
+            toast.error("Доступ к геолокации запрещён");
+            break;
+          case err.POSITION_UNAVAILABLE:
+            toast.error("Не удалось определить местоположение");
+            break;
+          case err.TIMEOUT:
+            toast.error("Время ожидания геолокации истекло");
+            break;
+          default:
+            toast.error("Ошибка геолокации");
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
+    );
+  }
+
+  // Zoom + locate controls
   const zoomControl = L.control({ position: "bottomright" });
   zoomControl.onAdd = () => {
     const div = L.DomUtil.create("div", "zoom-controls");
+    const locateBtn = L.DomUtil.create("button", "zoom-button", div);
+    locateBtn.innerHTML =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="18" height="18"><path stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>';
+    locateBtn.title = "Найти меня";
+    locateBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      locateUser();
+    });
     const zoomIn = L.DomUtil.create("button", "zoom-button", div);
     zoomIn.textContent = "+";
     zoomIn.addEventListener("click", (e) => {
