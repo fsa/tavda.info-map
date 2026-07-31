@@ -83,11 +83,6 @@ export default function Sidebar() {
         </div>
 
         <nav className="sidebar-nav">
-          <div className="search-wrapper">
-            <label className="search-label">Поиск</label>
-            <input type="text" placeholder="Поиск" className="search-input" />
-          </div>
-
           <div className="layers-section">
             <label className="layers-label" htmlFor="layer-select">Слой карты</label>
             <select
@@ -102,6 +97,11 @@ export default function Sidebar() {
                 </option>
               ))}
             </select>
+          </div>
+
+          <div className="search-wrapper">
+            <label className="search-label">Поиск</label>
+            <input type="text" placeholder="Поиск" className="search-input" />
           </div>
         </nav>
       </aside>
