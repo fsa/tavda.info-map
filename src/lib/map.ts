@@ -178,7 +178,7 @@ export function initMap(containerId: string) {
         const { latitude, longitude } = pos.coords;
         setUserMarker(latitude, longitude);
         if (followMode) {
-          map.flyTo([latitude, longitude], Math.max(map.getZoom(), 15), { duration: 0.5 });
+          map.flyTo([latitude, longitude], map.getZoom(), { duration: 0.5 });
         }
       },
       (err) => {
@@ -221,7 +221,7 @@ export function initMap(containerId: string) {
         const { latitude, longitude } = pos.coords;
         setUserMarker(latitude, longitude);
         showUserMarker();
-        map.flyTo([latitude, longitude], 15, { duration: 1.5 });
+        map.flyTo([latitude, longitude], map.getZoom(), { duration: 1.5 });
 
         if (watchId !== null) {
           // Отслеживание активно — включаем режим следования
