@@ -225,7 +225,7 @@ export function initMap(containerId: string) {
     toast.loading("Поиск местоположения…");
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const { latitude, longitude } = pos.coords;
+        const { latitude, longitude, accuracy } = pos.coords;
         setUserMarker(latitude, longitude);
         showUserMarker();
         markerShowCallback?.();
@@ -236,8 +236,12 @@ export function initMap(containerId: string) {
           // Отслеживание активно — включаем режим следования
           enableFollow();
           toast.success(`Слежение активно, карта следует за вами`);
-        } else {
+        } else if (accuracy <= 50) {
           toast.success(`Вы найдены: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+        } else if (accuracy <= 500) {
+          toast.info(`Местоположение определено по сети (точность ${accuracy.toFixed(0)} м)`);
+        } else {
+          toast.info(`Местоположение определено приблизительно (точность ${accuracy.toFixed(0)} м)`);
         }
       },
       (err) => {
