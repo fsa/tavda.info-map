@@ -326,3 +326,12 @@
   display: block;
   flex-shrink: 0;
 }
+
+.geo-btn-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.geo-btn-disabled:hover {
+  background-color: white;
+}

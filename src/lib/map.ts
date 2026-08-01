@@ -150,22 +150,28 @@ export function initMap(containerId: string) {
     return map.hasLayer(userMarker);
   }
 
-  /** Включить/выключить режим следования (без запуска watchPosition) */
-  function setFollowMode(follow: boolean) {
-    followMode = follow;
-    followChangeCallback?.(follow);
+  /** Включить/выключить режим следования (карта движется за пользователем) */
+  function enableFollow() {
+    followMode = true;
+    followChangeCallback?.(true);
   }
 
-  /** Запустить watchPosition. follow = true — двигать карту за пользователем */
-  function startWatching(follow: boolean) {
+  function disableFollow() {
+    followMode = false;
+    followChangeCallback?.(false);
+  }
+
+  function isFollowing(): boolean {
+    return followMode;
+  }
+
+  /** Запустить watchPosition (без автоматического следования) */
+  function startWatching() {
     if (!navigator.geolocation) {
       toast.error("Геолокация не поддерживается вашим браузером");
       return;
     }
-    if (watchId !== null) return; // уже отслеживаем
-
-    followMode = follow;
-    followChangeCallback?.(follow);
+    if (watchId !== null) return;
 
     watchId = navigator.geolocation.watchPosition(
       (pos) => {
@@ -188,18 +194,12 @@ export function initMap(containerId: string) {
       navigator.geolocation.clearWatch(watchId);
       watchId = null;
     }
-    followMode = false;
-    followChangeCallback?.(false);
+    disableFollow();
   }
 
   /** Проверить, активно ли отслеживание */
   function isWatching(): boolean {
     return watchId !== null;
-  }
-
-  /** Проверить, включён ли режим следования */
-  function isFollowing(): boolean {
-    return followMode;
   }
 
   // Отключаем follow при ручном перемещении карты
@@ -210,7 +210,7 @@ export function initMap(containerId: string) {
     }
   });
 
-  // Geolocation + автоматическое включение follow
+  // Geolocation: если отслеживание активно — центрируем карту и включаем follow
   function locateUser() {
     if (!navigator.geolocation) {
       toast.error("Геолокация не поддерживается вашим браузером");
@@ -220,11 +220,16 @@ export function initMap(containerId: string) {
       (pos) => {
         const { latitude, longitude } = pos.coords;
         setUserMarker(latitude, longitude);
-        // Показываем маркер, запускаем отслеживание с следованием
         showUserMarker();
-        startWatching(true);
         map.flyTo([latitude, longitude], 15, { duration: 1.5 });
-        toast.success(`Вы найдены: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+
+        if (watchId !== null) {
+          // Отслеживание активно — включаем режим следования
+          enableFollow();
+          toast.success(`Слежение активно, карта следует за вами`);
+        } else {
+          toast.success(`Вы найдены: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+        }
       },
       (err) => {
         switch (err.code) {
@@ -298,7 +303,8 @@ export function initMap(containerId: string) {
     stopWatching,
     isWatching,
     isFollowing,
-    setFollowMode,
+    enableFollow,
+    disableFollow,
     onFollowChange,
   };
 }

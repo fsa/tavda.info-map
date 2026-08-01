@@ -21,7 +21,7 @@ export default function Sidebar() {
     }
     return false;
   });
-  const [followMe, setFollowMe] = useState(false);
+  const [tracking, setTracking] = useState(false);
 
   // Синхронизация showMarker с картой и localStorage
   const syncShowMarker = useCallback((inst: MapInstance, visible: boolean) => {
@@ -29,16 +29,21 @@ export default function Sidebar() {
       inst.showUserMarker();
     } else {
       inst.hideUserMarker();
+      // Если скрываем маркер — отслеживание тоже отключается
+      if (inst.isWatching()) {
+        inst.stopWatching();
+        setTracking(false);
+      }
     }
     if (typeof localStorage !== "undefined") {
       localStorage.setItem(STORAGE_KEY_SHOW_MARKER, String(visible));
     }
   }, []);
 
-  // Синхронизация followMe с картой
-  const syncFollow = useCallback((inst: MapInstance, follow: boolean) => {
-    if (follow) {
-      inst.startWatching(true);
+  // Синхронизация tracking с картой
+  const syncTracking = useCallback((inst: MapInstance, enabled: boolean) => {
+    if (enabled) {
+      inst.startWatching();
     } else {
       inst.stopWatching();
     }
@@ -54,10 +59,6 @@ export default function Sidebar() {
       if (showMarker) {
         existing.showUserMarker();
       }
-      // Слушаем отключение follow из карты (например, при ручном перемещении)
-      existing.onFollowChange((following) => {
-        setFollowMe(following);
-      });
       return;
     }
     // Otherwise wait for the event
@@ -69,9 +70,6 @@ export default function Sidebar() {
       if (showMarker) {
         inst.showUserMarker();
       }
-      inst.onFollowChange((following) => {
-        setFollowMe(following);
-      });
     };
     window.addEventListener("map:ready", handler);
     return () => window.removeEventListener("map:ready", handler);
@@ -174,7 +172,7 @@ export default function Sidebar() {
             </select>
           </div>
 
-          {/* Geolocation controls — компактная группа кнопок */}
+          {/* Geolocation controls */}
           <div className="geolocation-section">
             <label className="geolocation-label">Геолокация</label>
             <div className="geo-btn-group">
@@ -195,21 +193,22 @@ export default function Sidebar() {
                 <span>Метка</span>
               </button>
               <button
-                className={`geo-btn${followMe ? " geo-btn-active" : ""}`}
+                className={`geo-btn${tracking ? " geo-btn-active" : ""}${!showMarker ? " geo-btn-disabled" : ""}`}
                 onClick={() => {
-                  const next = !followMe;
-                  setFollowMe(next);
-                  if (mapInstance) syncFollow(mapInstance, next);
+                  if (!showMarker) return;
+                  const next = !tracking;
+                  setTracking(next);
+                  if (mapInstance) syncTracking(mapInstance, next);
                 }}
-                title="Перемещать карту за мной"
-                aria-pressed={followMe}
+                title={showMarker ? "Постоянное отслеживание местоположения" : "Сначала включите метку"}
+                aria-pressed={tracking}
+                disabled={!showMarker}
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="16" height="16">
                   <circle cx="12" cy="12" r="3" strokeWidth="2" />
                   <path strokeWidth="2" strokeLinecap="round" d="M12 2v4M12 18v4M2 12h4M18 12h4" />
-                  <path strokeWidth="1.5" strokeLinecap="round" d="M5 5l4 4M19 5l-4 4M5 19l4-4M19 19l-4-4" />
                 </svg>
-                <span>За мной</span>
+                <span>Слежение</span>
               </button>
             </div>
           </div>
