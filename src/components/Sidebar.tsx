@@ -13,18 +13,16 @@ export default function Sidebar() {
   const [searching, setSearching] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Состояние геолокации — синхронизируем с сервисом
-  const [showMarker, setShowMarker] = useState(() => geoService.getState().showMarker);
-  const [tracking, setTracking] = useState(() => geoService.getState().tracking);
-
-  // Подписка на изменения сервиса геолокации
+  // Состояние геолокации — читаем напрямую из сервиса при каждом рендере.
+  // Счётчик увеличивается при каждом изменении, форсируя перерендер.
+  const [, forceUpdate] = useState(0);
   useEffect(() => {
-    const unsub = geoService.on((s) => {
-      setShowMarker(s.showMarker);
-      setTracking(s.tracking);
+    const unsub = geoService.on(() => {
+      forceUpdate((n) => n + 1);
     });
     return unsub;
   }, []);
+  const { showMarker, tracking } = geoService.getState();
 
   // Синхронизация showMarker с картой
   const syncShowMarker = useCallback((inst: MapInstance, visible: boolean) => {
@@ -166,7 +164,6 @@ export default function Sidebar() {
                 className={`geo-btn${showMarker ? " geo-btn-active" : ""}`}
                 onClick={() => {
                   const next = !showMarker;
-                  setShowMarker(next);
                   geoService.setShowMarker(next);
                   if (mapInstance) syncShowMarker(mapInstance, next);
                 }}
@@ -183,9 +180,7 @@ export default function Sidebar() {
                 className={`geo-btn${tracking ? " geo-btn-active" : ""}${!showMarker ? " geo-btn-disabled" : ""}`}
                 onClick={() => {
                   if (!showMarker) return;
-                  const next = !tracking;
-                  setTracking(next);
-                  geoService.setTracking(next);
+                  geoService.setTracking(!tracking);
                 }}
                 title={showMarker ? "Постоянное отслеживание местоположения" : "Сначала включите метку"}
                 aria-pressed={tracking}
