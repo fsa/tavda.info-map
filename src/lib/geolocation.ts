@@ -6,6 +6,14 @@ export interface GeoPosition {
   lat: number;
   lng: number;
   accuracy: number;
+  /** Высота над уровнем моря в метрах (null, если недоступно) */
+  altitude: number | null;
+  /** Точность высоты в метрах (null, если недоступно) */
+  altitudeAccuracy: number | null;
+  /** Направление движения в градусах по часовой стрелке от севера (null, если недоступно) */
+  heading: number | null;
+  /** Скорость движения в м/с (null, если недоступно) */
+  speed: number | null;
 }
 
 export interface GeoState {
@@ -106,8 +114,8 @@ class GeolocationService {
     toast.loading("Поиск местоположения…");
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const { latitude, longitude, accuracy } = pos.coords;
-        this.state.position = { lat: latitude, lng: longitude, accuracy };
+        const { latitude, longitude, accuracy, altitude, altitudeAccuracy, heading, speed } = pos.coords;
+        this.state.position = { lat: latitude, lng: longitude, accuracy, altitude, altitudeAccuracy, heading, speed };
         this.emit();
 
         toast.dismissAll();
@@ -166,8 +174,8 @@ class GeolocationService {
 
     this.watchId = navigator.geolocation.watchPosition(
       (pos) => {
-        const { latitude, longitude } = pos.coords;
-        this.state.position = { lat: latitude, lng: longitude, accuracy: pos.coords.accuracy };
+        const { latitude, longitude, accuracy, altitude, altitudeAccuracy, heading, speed } = pos.coords;
+        this.state.position = { lat: latitude, lng: longitude, accuracy, altitude, altitudeAccuracy, heading, speed };
         this.emit();
       },
       (err) => {
