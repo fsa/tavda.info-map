@@ -222,7 +222,7 @@ export function initMap(containerId: string) {
         const { latitude, longitude, accuracy } = pos.coords;
         setUserMarker(latitude, longitude);
         showUserMarker();
-        window.dispatchEvent(new CustomEvent("user-marker:force-show"));
+        (window as any).__triggerMarkerForceShow?.();
         map.flyTo([latitude, longitude], map.getZoom(), { duration: 1.5 });
 
         toast.dismissAll();

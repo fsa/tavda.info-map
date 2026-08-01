@@ -50,14 +50,13 @@ export default function Sidebar() {
   }, []);
 
   useEffect(() => {
-    // Слушаем принудительное включение маркера из locateUser
-    const forceShowHandler = () => {
+    // Регистрируем глобальный обработчик принудительного показа маркера
+    (window as any).__onMarkerForceShow?.(() => {
       setShowMarker(true);
       if (typeof localStorage !== "undefined") {
         localStorage.setItem(STORAGE_KEY_SHOW_MARKER, "true");
       }
-    };
-    window.addEventListener("user-marker:force-show", forceShowHandler);
+    });
 
     // Check if map already initialized (script runs before React hydrates)
     const existing = (window as any).__map as MapInstance | undefined;
@@ -68,7 +67,7 @@ export default function Sidebar() {
       if (showMarker) {
         existing.showUserMarker();
       }
-      return () => window.removeEventListener("user-marker:force-show", forceShowHandler);
+      return;
     }
     // Otherwise wait for the event
     const handler = (e: Event) => {
@@ -81,10 +80,7 @@ export default function Sidebar() {
       }
     };
     window.addEventListener("map:ready", handler);
-    return () => {
-      window.removeEventListener("map:ready", handler);
-      window.removeEventListener("user-marker:force-show", forceShowHandler);
-    };
+    return () => window.removeEventListener("map:ready", handler);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLayerChange = (layer: MapLayer) => {

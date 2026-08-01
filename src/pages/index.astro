@@ -18,5 +18,16 @@ import "../styles/map.css";
     const instance = initMap("map");
     (window as any).__map = instance;
     window.dispatchEvent(new CustomEvent("map:ready", { detail: instance }));
+
+    // Глобальный флаг — маркер принудительно показан (из locateUser)
+    // Используется, чтобы Sidebar мог синхронизироваться даже если React
+    // ещё не гидратировался или перерендерился.
+    let _markerForceShowHandlers: Array<() => void> = [];
+    (window as any).__onMarkerForceShow = (fn: () => void) => {
+      _markerForceShowHandlers.push(fn);
+    };
+    (window as any).__triggerMarkerForceShow = () => {
+      for (const fn of _markerForceShowHandlers) fn();
+    };
   </script>
 </Layout>
