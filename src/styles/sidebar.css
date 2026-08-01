@@ -42,8 +42,7 @@
 
 .sidebar-brand {
   display: flex;
-  flex-direction: column;
-  gap: 0;
+  align-items: center;
   min-width: 0;
 }
 
@@ -73,12 +72,6 @@
   font-size: 0.875rem;
   font-weight: 600;
   white-space: nowrap;
-}
-
-.sidebar-subtitle {
-  font-size: 0.6875rem;
-  color: rgb(156 163 175);
-  margin-left: 0.125rem;
 }
 
 .sidebar-actions {

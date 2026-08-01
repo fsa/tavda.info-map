@@ -224,6 +224,14 @@ export function initMap(containerId: string) {
       e.stopPropagation();
       locateUser();
     });
+    const homeBtn = L.DomUtil.create("button", "zoom-button", div);
+    homeBtn.innerHTML =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="18" height="18"><path stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z"/><path stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M9 21V12h6v9"/></svg>';
+    homeBtn.title = "Показать Тавду";
+    homeBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      flyToTavda();
+    });
     const zoomIn = L.DomUtil.create("button", "zoom-button", div);
     zoomIn.textContent = "+";
     zoomIn.addEventListener("click", (e) => {
