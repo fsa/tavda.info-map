@@ -216,13 +216,17 @@ export function initMap(containerId: string) {
       toast.error("Геолокация не поддерживается вашим браузером");
       return;
     }
+
+    // Сразу показываем маркер и оповещаем UI, не дожидаясь ответа геолокации
+    showUserMarker();
+    window.dispatchEvent(new CustomEvent("user-marker:force-show"));
+
     toast.loading("Поиск местоположения…");
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude, accuracy } = pos.coords;
         setUserMarker(latitude, longitude);
         showUserMarker();
-        window.dispatchEvent(new CustomEvent("user-marker:force-show"));
         map.flyTo([latitude, longitude], map.getZoom(), { duration: 1.5 });
 
         toast.dismissAll();
