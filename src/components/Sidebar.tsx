@@ -21,7 +21,6 @@ export default function Sidebar() {
     }
     return false;
   });
-  const [liveTracking, setLiveTracking] = useState(false);
   const [followMe, setFollowMe] = useState(false);
 
   // Синхронизация showMarker с картой и localStorage
@@ -36,17 +35,14 @@ export default function Sidebar() {
     }
   }, []);
 
-  // Синхронизация liveTracking/followMe с картой
-  const syncTracking = useCallback(
-    (inst: MapInstance, track: boolean, follow: boolean) => {
-      if (track || follow) {
-        inst.startWatching(follow);
-      } else {
-        inst.stopWatching();
-      }
-    },
-    [],
-  );
+  // Синхронизация followMe с картой
+  const syncFollow = useCallback((inst: MapInstance, follow: boolean) => {
+    if (follow) {
+      inst.startWatching(true);
+    } else {
+      inst.stopWatching();
+    }
+  }, []);
 
   useEffect(() => {
     // Check if map already initialized (script runs before React hydrates)
@@ -58,6 +54,10 @@ export default function Sidebar() {
       if (showMarker) {
         existing.showUserMarker();
       }
+      // Слушаем отключение follow из карты (например, при ручном перемещении)
+      existing.onFollowChange((following) => {
+        setFollowMe(following);
+      });
       return;
     }
     // Otherwise wait for the event
@@ -69,6 +69,9 @@ export default function Sidebar() {
       if (showMarker) {
         inst.showUserMarker();
       }
+      inst.onFollowChange((following) => {
+        setFollowMe(following);
+      });
     };
     window.addEventListener("map:ready", handler);
     return () => window.removeEventListener("map:ready", handler);
@@ -192,39 +195,11 @@ export default function Sidebar() {
                 <span>Метка</span>
               </button>
               <button
-                className={`geo-btn${liveTracking ? " geo-btn-active" : ""}`}
-                onClick={() => {
-                  const next = !liveTracking;
-                  setLiveTracking(next);
-                  if (mapInstance) syncTracking(mapInstance, next || followMe, followMe);
-                  // Если выключаем liveTracking и followMe был включён — он тоже выключится
-                  if (!next) {
-                    setFollowMe(false);
-                    if (mapInstance) mapInstance.stopWatching();
-                  }
-                }}
-                title="Отслеживать перемещение"
-                aria-pressed={liveTracking}
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="16" height="16">
-                  <circle cx="12" cy="12" r="3" strokeWidth="2" />
-                  <path strokeWidth="2" strokeLinecap="round" d="M12 2v4M12 18v4M2 12h4M18 12h4" />
-                </svg>
-                <span>Следить</span>
-              </button>
-              <button
                 className={`geo-btn${followMe ? " geo-btn-active" : ""}`}
                 onClick={() => {
                   const next = !followMe;
                   setFollowMe(next);
-                  if (next) {
-                    // follow включает и отслеживание
-                    setLiveTracking(true);
-                    if (mapInstance) mapInstance.startWatching(true);
-                  } else {
-                    // выключаем follow, но liveTracking может остаться
-                    if (mapInstance) mapInstance.startWatching(false);
-                  }
+                  if (mapInstance) syncFollow(mapInstance, next);
                 }}
                 title="Перемещать карту за мной"
                 aria-pressed={followMe}

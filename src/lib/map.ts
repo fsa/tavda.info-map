@@ -111,6 +111,12 @@ export function initMap(containerId: string) {
   let watchId: number | null = null;
   let lastUserCoords: { lat: number; lng: number } | null = null;
   let followMode = false;
+  let followChangeCallback: ((following: boolean) => void) | null = null;
+
+  /** Подписаться на изменения режима следования */
+  function onFollowChange(cb: (following: boolean) => void) {
+    followChangeCallback = cb;
+  }
 
   /** Обновить или создать маркер пользователя на карте */
   function setUserMarker(lat: number, lng: number) {
@@ -144,6 +150,12 @@ export function initMap(containerId: string) {
     return map.hasLayer(userMarker);
   }
 
+  /** Включить/выключить режим следования (без запуска watchPosition) */
+  function setFollowMode(follow: boolean) {
+    followMode = follow;
+    followChangeCallback?.(follow);
+  }
+
   /** Запустить watchPosition. follow = true — двигать карту за пользователем */
   function startWatching(follow: boolean) {
     if (!navigator.geolocation) {
@@ -153,6 +165,7 @@ export function initMap(containerId: string) {
     if (watchId !== null) return; // уже отслеживаем
 
     followMode = follow;
+    followChangeCallback?.(follow);
 
     watchId = navigator.geolocation.watchPosition(
       (pos) => {
@@ -176,6 +189,7 @@ export function initMap(containerId: string) {
       watchId = null;
     }
     followMode = false;
+    followChangeCallback?.(false);
   }
 
   /** Проверить, активно ли отслеживание */
@@ -188,7 +202,15 @@ export function initMap(containerId: string) {
     return followMode;
   }
 
-  // Geolocation (однократное определение)
+  // Отключаем follow при ручном перемещении карты
+  map.on("dragstart", () => {
+    if (followMode) {
+      followMode = false;
+      followChangeCallback?.(false);
+    }
+  });
+
+  // Geolocation + автоматическое включение follow
   function locateUser() {
     if (!navigator.geolocation) {
       toast.error("Геолокация не поддерживается вашим браузером");
@@ -198,6 +220,9 @@ export function initMap(containerId: string) {
       (pos) => {
         const { latitude, longitude } = pos.coords;
         setUserMarker(latitude, longitude);
+        // Показываем маркер, запускаем отслеживание с следованием
+        showUserMarker();
+        startWatching(true);
         map.flyTo([latitude, longitude], 15, { duration: 1.5 });
         toast.success(`Вы найдены: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
       },
@@ -273,6 +298,8 @@ export function initMap(containerId: string) {
     stopWatching,
     isWatching,
     isFollowing,
+    setFollowMode,
+    onFollowChange,
   };
 }
 
