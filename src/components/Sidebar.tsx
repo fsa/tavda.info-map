@@ -131,19 +131,18 @@ export default function Sidebar() {
       <aside className={sidebarClass}>
         <div className="sidebar-header">
           <div className="sidebar-brand">
-            <a href="https://tavda.info" className="sidebar-back" aria-label="На Тавда.инфо">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="20" height="20">
-                <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M19 12H5m7-7-7 7 7 7" />
-              </svg>
+            <a href="https://tavda.info" className="sidebar-logo-link" aria-label="На главную Тавда.инфо">
+              <img src="/logo.svg" alt="" className="sidebar-logo" />
+              <span className="sidebar-title">Тавда.инфо</span>
             </a>
-            <img src="/logo.svg" alt="" className="sidebar-logo" />
-            <h2 className="sidebar-title">Тавда</h2>
+            <span className="sidebar-subtitle">Карта</span>
           </div>
           <div className="sidebar-actions">
             <button
               onClick={() => { mapInstance?.flyToTavda(); setOpen(false); }}
               className="icon-btn"
               aria-label="Показать Тавду на карте"
+              title="Показать Тавду"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="20" height="20">
                 <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z" />
@@ -153,9 +152,12 @@ export default function Sidebar() {
             <button
               onClick={() => setOpen(false)}
               className="icon-btn"
-              aria-label="Скрыть меню"
+              aria-label="Закрыть меню"
+              title="Закрыть"
             >
-              ✕
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="20" height="20">
+                <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M18 6 6 18M6 6l12 12" />
+              </svg>
             </button>
           </div>
         </div>
