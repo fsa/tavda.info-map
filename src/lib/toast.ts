@@ -35,17 +35,31 @@ function show(message: string, type: "success" | "error" | "info" | "loading", d
   });
 
   // Авто-скрытие
-  setTimeout(() => {
-    toast.classList.remove("toast-visible");
-    toast.addEventListener("transitionend", () => {
-      toast.remove();
-    });
-  }, duration);
+  if (duration > 0) {
+    setTimeout(() => {
+      toast.classList.remove("toast-visible");
+      toast.addEventListener("transitionend", () => {
+        toast.remove();
+      });
+    }, duration);
+  }
+}
+
+/** Скрыть все активные уведомления */
+function dismissAll() {
+  const container = getContainer();
+  while (container.firstChild) {
+    container.removeChild(container.firstChild);
+  }
 }
 
 export const toast = {
   success: (msg: string) => show(msg, "success"),
   error: (msg: string) => show(msg, "error"),
   info: (msg: string) => show(msg, "info"),
-  loading: (msg: string) => show(msg, "loading", 0), // 0 = не скрывается автоматически
+  loading: (msg: string) => {
+    dismissAll();
+    show(msg, "loading", 0);
+  },
+  dismissAll,
 };

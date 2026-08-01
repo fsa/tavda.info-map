@@ -224,6 +224,7 @@ export function initMap(containerId: string) {
         showUserMarker();
         map.flyTo([latitude, longitude], map.getZoom(), { duration: 1.5 });
 
+        toast.dismissAll();
         if (watchId !== null) {
           // Отслеживание активно — включаем режим следования
           enableFollow();
@@ -233,6 +234,7 @@ export function initMap(containerId: string) {
         }
       },
       (err) => {
+        toast.dismissAll();
         switch (err.code) {
           case err.PERMISSION_DENIED:
             toast.error("Доступ к геолокации запрещён");
