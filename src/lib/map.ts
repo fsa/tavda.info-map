@@ -98,6 +98,26 @@ export function initMap(containerId: string) {
     return currentLayer;
   }
 
+  // --- User location marker ---
+
+  /** Кастомная divIcon — синий пульсирующий кружок */
+  const userIcon = L.divIcon({
+    className: "user-location-marker",
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+  });
+
+  let userMarker: L.Marker | null = null;
+
+  /** Обновить или создать маркер пользователя на карте */
+  function setUserMarker(lat: number, lng: number) {
+    if (userMarker) {
+      userMarker.setLatLng([lat, lng]);
+    } else {
+      userMarker = L.marker([lat, lng], { icon: userIcon, zIndexOffset: 10000 }).addTo(map);
+    }
+  }
+
   // Geolocation
   function locateUser() {
     if (!navigator.geolocation) {
@@ -107,6 +127,7 @@ export function initMap(containerId: string) {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
+        setUserMarker(latitude, longitude);
         map.flyTo([latitude, longitude], 15, { duration: 1.5 });
         toast.success(`Вы найдены: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
       },

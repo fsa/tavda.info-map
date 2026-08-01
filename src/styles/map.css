@@ -69,3 +69,33 @@
 .toast-info {
   background-color: #2563eb;
 }
+
+/* User location marker — синий пульсирующий кружок */
+.user-location-marker {
+  background: none !important;
+  border: none !important;
+}
+
+.user-location-marker::before {
+  content: "";
+  display: block;
+  width: 24px;
+  height: 24px;
+  background: #3b82f6;
+  border: 3px solid #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4);
+  animation: user-location-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes user-location-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 12px rgba(59, 130, 246, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+  }
+}
