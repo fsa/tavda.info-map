@@ -59,6 +59,13 @@ export default function Sidebar() {
       if (showMarker) {
         existing.showUserMarker();
       }
+      // При принудительном показе маркера (из locateUser) синхронизируем состояние
+      existing.onMarkerForceShow(() => {
+        setShowMarker(true);
+        if (typeof localStorage !== "undefined") {
+          localStorage.setItem(STORAGE_KEY_SHOW_MARKER, "true");
+        }
+      });
       return;
     }
     // Otherwise wait for the event
@@ -70,6 +77,12 @@ export default function Sidebar() {
       if (showMarker) {
         inst.showUserMarker();
       }
+      inst.onMarkerForceShow(() => {
+        setShowMarker(true);
+        if (typeof localStorage !== "undefined") {
+          localStorage.setItem(STORAGE_KEY_SHOW_MARKER, "true");
+        }
+      });
     };
     window.addEventListener("map:ready", handler);
     return () => window.removeEventListener("map:ready", handler);

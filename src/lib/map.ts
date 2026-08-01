@@ -112,10 +112,16 @@ export function initMap(containerId: string) {
   let lastUserCoords: { lat: number; lng: number } | null = null;
   let followMode = false;
   let followChangeCallback: ((following: boolean) => void) | null = null;
+  let markerShowCallback: (() => void) | null = null;
 
   /** Подписаться на изменения режима следования */
   function onFollowChange(cb: (following: boolean) => void) {
     followChangeCallback = cb;
+  }
+
+  /** Подписаться на принудительное включение маркера (из locateUser) */
+  function onMarkerForceShow(cb: () => void) {
+    markerShowCallback = cb;
   }
 
   /** Обновить или создать маркер пользователя на карте */
@@ -222,6 +228,7 @@ export function initMap(containerId: string) {
         const { latitude, longitude } = pos.coords;
         setUserMarker(latitude, longitude);
         showUserMarker();
+        markerShowCallback?.();
         map.flyTo([latitude, longitude], map.getZoom(), { duration: 1.5 });
 
         toast.dismissAll();
@@ -309,6 +316,7 @@ export function initMap(containerId: string) {
     enableFollow,
     disableFollow,
     onFollowChange,
+    onMarkerForceShow,
   };
 }
 
