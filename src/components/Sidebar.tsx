@@ -50,6 +50,15 @@ export default function Sidebar() {
   }, []);
 
   useEffect(() => {
+    // Слушаем принудительное включение маркера из locateUser
+    const forceShowHandler = () => {
+      setShowMarker(true);
+      if (typeof localStorage !== "undefined") {
+        localStorage.setItem(STORAGE_KEY_SHOW_MARKER, "true");
+      }
+    };
+    window.addEventListener("user-marker:force-show", forceShowHandler);
+
     // Check if map already initialized (script runs before React hydrates)
     const existing = (window as any).__map as MapInstance | undefined;
     if (existing) {
@@ -59,14 +68,7 @@ export default function Sidebar() {
       if (showMarker) {
         existing.showUserMarker();
       }
-      // При принудительном показе маркера (из locateUser) синхронизируем состояние
-      existing.onMarkerForceShow(() => {
-        setShowMarker(true);
-        if (typeof localStorage !== "undefined") {
-          localStorage.setItem(STORAGE_KEY_SHOW_MARKER, "true");
-        }
-      });
-      return;
+      return () => window.removeEventListener("user-marker:force-show", forceShowHandler);
     }
     // Otherwise wait for the event
     const handler = (e: Event) => {
@@ -77,15 +79,12 @@ export default function Sidebar() {
       if (showMarker) {
         inst.showUserMarker();
       }
-      inst.onMarkerForceShow(() => {
-        setShowMarker(true);
-        if (typeof localStorage !== "undefined") {
-          localStorage.setItem(STORAGE_KEY_SHOW_MARKER, "true");
-        }
-      });
     };
     window.addEventListener("map:ready", handler);
-    return () => window.removeEventListener("map:ready", handler);
+    return () => {
+      window.removeEventListener("map:ready", handler);
+      window.removeEventListener("user-marker:force-show", forceShowHandler);
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLayerChange = (layer: MapLayer) => {
