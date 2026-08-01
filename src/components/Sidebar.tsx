@@ -14,7 +14,7 @@ export default function Sidebar() {
   const [searching, setSearching] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Состояние переключателей
+  // Состояние геолокационных опций
   const [showMarker, setShowMarker] = useState(() => {
     if (typeof localStorage !== "undefined") {
       return localStorage.getItem(STORAGE_KEY_SHOW_MARKER) === "true";
@@ -22,6 +22,7 @@ export default function Sidebar() {
     return false;
   });
   const [liveTracking, setLiveTracking] = useState(false);
+  const [followMe, setFollowMe] = useState(false);
 
   // Синхронизация showMarker с картой и localStorage
   const syncShowMarker = useCallback((inst: MapInstance, visible: boolean) => {
@@ -35,14 +36,17 @@ export default function Sidebar() {
     }
   }, []);
 
-  // Синхронизация liveTracking с картой
-  const syncLiveTracking = useCallback((inst: MapInstance, enabled: boolean) => {
-    if (enabled) {
-      inst.startWatching();
-    } else {
-      inst.stopWatching();
-    }
-  }, []);
+  // Синхронизация liveTracking/followMe с картой
+  const syncTracking = useCallback(
+    (inst: MapInstance, track: boolean, follow: boolean) => {
+      if (track || follow) {
+        inst.startWatching(follow);
+      } else {
+        inst.stopWatching();
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     // Check if map already initialized (script runs before React hydrates)
@@ -167,57 +171,72 @@ export default function Sidebar() {
             </select>
           </div>
 
-          {/* Geolocation toggles */}
+          {/* Geolocation controls — компактная группа кнопок */}
           <div className="geolocation-section">
-            <label className="toggle-row">
-              <span className="toggle-label">Показать моё местоположение</span>
-              <span
-                className={`toggle-switch${showMarker ? " toggle-switch-on" : ""}`}
-                role="switch"
-                aria-checked={showMarker}
-                tabIndex={0}
+            <label className="geolocation-label">Геолокация</label>
+            <div className="geo-btn-group">
+              <button
+                className={`geo-btn${showMarker ? " geo-btn-active" : ""}`}
                 onClick={() => {
                   const next = !showMarker;
                   setShowMarker(next);
                   if (mapInstance) syncShowMarker(mapInstance, next);
                 }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    const next = !showMarker;
-                    setShowMarker(next);
-                    if (mapInstance) syncShowMarker(mapInstance, next);
-                  }
-                }}
+                title="Показать маркер на карте"
+                aria-pressed={showMarker}
               >
-                <span className="toggle-knob" />
-              </span>
-            </label>
-
-            <label className="toggle-row">
-              <span className="toggle-label">Постоянное отслеживание</span>
-              <span
-                className={`toggle-switch${liveTracking ? " toggle-switch-on" : ""}`}
-                role="switch"
-                aria-checked={liveTracking}
-                tabIndex={0}
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="16" height="16">
+                  <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7z" />
+                  <circle cx="12" cy="9" r="2.5" />
+                </svg>
+                <span>Метка</span>
+              </button>
+              <button
+                className={`geo-btn${liveTracking ? " geo-btn-active" : ""}`}
                 onClick={() => {
                   const next = !liveTracking;
                   setLiveTracking(next);
-                  if (mapInstance) syncLiveTracking(mapInstance, next);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    const next = !liveTracking;
-                    setLiveTracking(next);
-                    if (mapInstance) syncLiveTracking(mapInstance, next);
+                  if (mapInstance) syncTracking(mapInstance, next || followMe, followMe);
+                  // Если выключаем liveTracking и followMe был включён — он тоже выключится
+                  if (!next) {
+                    setFollowMe(false);
+                    if (mapInstance) mapInstance.stopWatching();
                   }
                 }}
+                title="Отслеживать перемещение"
+                aria-pressed={liveTracking}
               >
-                <span className="toggle-knob" />
-              </span>
-            </label>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="16" height="16">
+                  <circle cx="12" cy="12" r="3" strokeWidth="2" />
+                  <path strokeWidth="2" strokeLinecap="round" d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+                </svg>
+                <span>Следить</span>
+              </button>
+              <button
+                className={`geo-btn${followMe ? " geo-btn-active" : ""}`}
+                onClick={() => {
+                  const next = !followMe;
+                  setFollowMe(next);
+                  if (next) {
+                    // follow включает и отслеживание
+                    setLiveTracking(true);
+                    if (mapInstance) mapInstance.startWatching(true);
+                  } else {
+                    // выключаем follow, но liveTracking может остаться
+                    if (mapInstance) mapInstance.startWatching(false);
+                  }
+                }}
+                title="Перемещать карту за мной"
+                aria-pressed={followMe}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="16" height="16">
+                  <circle cx="12" cy="12" r="3" strokeWidth="2" />
+                  <path strokeWidth="2" strokeLinecap="round" d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+                  <path strokeWidth="1.5" strokeLinecap="round" d="M5 5l4 4M19 5l-4 4M5 19l4-4M19 19l-4-4" />
+                </svg>
+                <span>За мной</span>
+              </button>
+            </div>
           </div>
 
           <div className="search-wrapper">

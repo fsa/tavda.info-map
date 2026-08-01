@@ -110,6 +110,7 @@ export function initMap(containerId: string) {
   let userMarker: L.Marker | null = null;
   let watchId: number | null = null;
   let lastUserCoords: { lat: number; lng: number } | null = null;
+  let followMode = false;
 
   /** Обновить или создать маркер пользователя на карте */
   function setUserMarker(lat: number, lng: number) {
@@ -143,21 +144,22 @@ export function initMap(containerId: string) {
     return map.hasLayer(userMarker);
   }
 
-  /** Запустить постоянное отслеживание */
-  function startWatching() {
+  /** Запустить watchPosition. follow = true — двигать карту за пользователем */
+  function startWatching(follow: boolean) {
     if (!navigator.geolocation) {
       toast.error("Геолокация не поддерживается вашим браузером");
       return;
     }
     if (watchId !== null) return; // уже отслеживаем
 
+    followMode = follow;
+
     watchId = navigator.geolocation.watchPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
         setUserMarker(latitude, longitude);
-        // Если маркер скрыт — не показываем принудительно
-        if (userMarker && !map.hasLayer(userMarker)) {
-          // ничего не делаем, маркер остаётся скрытым
+        if (followMode) {
+          map.flyTo([latitude, longitude], Math.max(map.getZoom(), 15), { duration: 0.5 });
         }
       },
       (err) => {
@@ -167,17 +169,23 @@ export function initMap(containerId: string) {
     );
   }
 
-  /** Остановить постоянное отслеживание */
+  /** Остановить watchPosition */
   function stopWatching() {
     if (watchId !== null) {
       navigator.geolocation.clearWatch(watchId);
       watchId = null;
     }
+    followMode = false;
   }
 
   /** Проверить, активно ли отслеживание */
   function isWatching(): boolean {
     return watchId !== null;
+  }
+
+  /** Проверить, включён ли режим следования */
+  function isFollowing(): boolean {
+    return followMode;
   }
 
   // Geolocation (однократное определение)
@@ -264,6 +272,7 @@ export function initMap(containerId: string) {
     startWatching,
     stopWatching,
     isWatching,
+    isFollowing,
   };
 }
 
