@@ -2,8 +2,7 @@ import { useState, useEffect, useRef, useCallback, type FormEvent, type Keyboard
 import type { MapInstance, MapLayer } from "../lib/map";
 import { LAYERS } from "../lib/layers";
 import { search, type SearchResult } from "../lib/search";
-
-const STORAGE_KEY_SHOW_MARKER = "tavda:showUserMarker";
+import { geoService } from "../lib/geolocation";
 
 export default function Sidebar() {
   const [open, setOpen] = useState(false);
@@ -14,51 +13,29 @@ export default function Sidebar() {
   const [searching, setSearching] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Состояние геолокационных опций
-  const [showMarker, setShowMarker] = useState(() => {
-    if (typeof localStorage !== "undefined") {
-      return localStorage.getItem(STORAGE_KEY_SHOW_MARKER) === "true";
-    }
-    return false;
-  });
-  const [tracking, setTracking] = useState(false);
+  // Состояние геолокации — синхронизируем с сервисом
+  const [showMarker, setShowMarker] = useState(() => geoService.getState().showMarker);
+  const [tracking, setTracking] = useState(() => geoService.getState().tracking);
 
-  // Синхронизация showMarker с картой и localStorage
+  // Подписка на изменения сервиса геолокации
+  useEffect(() => {
+    const unsub = geoService.on((s) => {
+      setShowMarker(s.showMarker);
+      setTracking(s.tracking);
+    });
+    return unsub;
+  }, []);
+
+  // Синхронизация showMarker с картой
   const syncShowMarker = useCallback((inst: MapInstance, visible: boolean) => {
     if (visible) {
       inst.showUserMarker();
     } else {
       inst.hideUserMarker();
-      // Если скрываем маркер — отслеживание тоже отключается
-      if (inst.isWatching()) {
-        inst.stopWatching();
-        setTracking(false);
-      }
-    }
-    if (typeof localStorage !== "undefined") {
-      localStorage.setItem(STORAGE_KEY_SHOW_MARKER, String(visible));
-    }
-  }, []);
-
-  // Синхронизация tracking с картой
-  const syncTracking = useCallback((inst: MapInstance, enabled: boolean) => {
-    if (enabled) {
-      inst.startWatching();
-    } else {
-      inst.stopWatching();
     }
   }, []);
 
   useEffect(() => {
-    // Слушаем принудительный показ маркера (из locateUser на карте)
-    const onMarkerForceShow = () => {
-      setShowMarker(true);
-      if (typeof localStorage !== "undefined") {
-        localStorage.setItem(STORAGE_KEY_SHOW_MARKER, "true");
-      }
-    };
-    window.addEventListener("user-marker:force-show", onMarkerForceShow);
-
     // Check if map already initialized (script runs before React hydrates)
     const existing = (window as any).__map as MapInstance | undefined;
     if (existing) {
@@ -80,17 +57,8 @@ export default function Sidebar() {
         }
       };
       window.addEventListener("map:ready", handler);
-      // cleanup for map:ready only
-      return () => {
-        window.removeEventListener("map:ready", handler);
-        window.removeEventListener("user-marker:force-show", onMarkerForceShow);
-      };
+      return () => window.removeEventListener("map:ready", handler);
     }
-
-    // cleanup for the existing path
-    return () => {
-      window.removeEventListener("user-marker:force-show", onMarkerForceShow);
-    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLayerChange = (layer: MapLayer) => {
@@ -199,6 +167,7 @@ export default function Sidebar() {
                 onClick={() => {
                   const next = !showMarker;
                   setShowMarker(next);
+                  geoService.setShowMarker(next);
                   if (mapInstance) syncShowMarker(mapInstance, next);
                 }}
                 title="Показать маркер на карте"
@@ -216,7 +185,7 @@ export default function Sidebar() {
                   if (!showMarker) return;
                   const next = !tracking;
                   setTracking(next);
-                  if (mapInstance) syncTracking(mapInstance, next);
+                  geoService.setTracking(next);
                 }}
                 title={showMarker ? "Постоянное отслеживание местоположения" : "Сначала включите метку"}
                 aria-pressed={tracking}
