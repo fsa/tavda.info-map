@@ -145,9 +145,9 @@ export function initMap(containerId: string) {
     if (s.position) {
       setUserMarker(s.position.lat, s.position.lng);
     }
-    if (s.showMarker && s.position) {
+    if (s.showMarker) {
       showUserMarker();
-    } else if (!s.showMarker) {
+    } else {
       hideUserMarker();
     }
     // Режим следования — двигаем карту за пользователем
