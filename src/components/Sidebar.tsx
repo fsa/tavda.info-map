@@ -50,12 +50,14 @@ export default function Sidebar() {
   }, []);
 
   useEffect(() => {
-    const onMarkerShow = () => {
+    // Слушаем принудительный показ маркера (из locateUser на карте)
+    const onMarkerForceShow = () => {
       setShowMarker(true);
       if (typeof localStorage !== "undefined") {
         localStorage.setItem(STORAGE_KEY_SHOW_MARKER, "true");
       }
     };
+    window.addEventListener("user-marker:force-show", onMarkerForceShow);
 
     // Check if map already initialized (script runs before React hydrates)
     const existing = (window as any).__map as MapInstance | undefined;
@@ -66,23 +68,29 @@ export default function Sidebar() {
       if (showMarker) {
         existing.showUserMarker();
       }
-      // Подписываемся на принудительный показ маркера
-      existing.onMarkerForceShow(onMarkerShow);
-      return;
+    } else {
+      // Otherwise wait for the event
+      const handler = (e: Event) => {
+        const inst = (e as CustomEvent).detail as MapInstance;
+        setMapInstance(inst);
+        setActiveLayerState(inst.getActiveLayer());
+        // Применяем сохранённую настройку показа маркера
+        if (showMarker) {
+          inst.showUserMarker();
+        }
+      };
+      window.addEventListener("map:ready", handler);
+      // cleanup for map:ready only
+      return () => {
+        window.removeEventListener("map:ready", handler);
+        window.removeEventListener("user-marker:force-show", onMarkerForceShow);
+      };
     }
-    // Otherwise wait for the event
-    const handler = (e: Event) => {
-      const inst = (e as CustomEvent).detail as MapInstance;
-      setMapInstance(inst);
-      setActiveLayerState(inst.getActiveLayer());
-      // Применяем сохранённую настройку показа маркера
-      if (showMarker) {
-        inst.showUserMarker();
-      }
-      inst.onMarkerForceShow(onMarkerShow);
+
+    // cleanup for the existing path
+    return () => {
+      window.removeEventListener("user-marker:force-show", onMarkerForceShow);
     };
-    window.addEventListener("map:ready", handler);
-    return () => window.removeEventListener("map:ready", handler);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLayerChange = (layer: MapLayer) => {
