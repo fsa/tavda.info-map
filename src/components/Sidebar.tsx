@@ -177,41 +177,6 @@ export default function Sidebar() {
             </select>
           </div>
 
-          <div className="search-wrapper">
-            <label className="search-label">Поиск</label>
-            <form className="search-form" onSubmit={handleFormSubmit}>
-              <input
-                ref={inputRef}
-                type="text"
-                placeholder="Поиск"
-                className="search-input"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={handleKeyDown}
-              />
-              <button
-                type="submit"
-                className="search-submit-btn"
-                aria-label="Найти"
-                tabIndex={-1}
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="18" height="18">
-                  <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z" />
-                </svg>
-              </button>
-            </form>
-
-            {searching && (
-              <div className="search-status search-status-loading">Поиск…</div>
-            )}
-
-            {searchResult && (
-              <div className={`search-status search-status-${searchResult.type}`}>
-                {searchResult.message}
-              </div>
-            )}
-          </div>
-
           {/* Geolocation toggles */}
           <div className="geolocation-section">
             <label className="toggle-row">
@@ -263,6 +228,41 @@ export default function Sidebar() {
                 <span className="toggle-knob" />
               </span>
             </label>
+          </div>
+
+          <div className="search-wrapper">
+            <label className="search-label">Поиск</label>
+            <form className="search-form" onSubmit={handleFormSubmit}>
+              <input
+                ref={inputRef}
+                type="text"
+                placeholder="Поиск"
+                className="search-input"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={handleKeyDown}
+              />
+              <button
+                type="submit"
+                className="search-submit-btn"
+                aria-label="Найти"
+                tabIndex={-1}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="18" height="18">
+                  <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z" />
+                </svg>
+              </button>
+            </form>
+
+            {searching && (
+              <div className="search-status search-status-loading">Поиск…</div>
+            )}
+
+            {searchResult && (
+              <div className={`search-status search-status-${searchResult.type}`}>
+                {searchResult.message}
+              </div>
+            )}
           </div>
         </nav>
       </aside>
