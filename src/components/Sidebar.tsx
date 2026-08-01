@@ -50,13 +50,12 @@ export default function Sidebar() {
   }, []);
 
   useEffect(() => {
-    // Регистрируем глобальный обработчик принудительного показа маркера
-    (window as any).__onMarkerForceShow?.(() => {
+    const onMarkerShow = () => {
       setShowMarker(true);
       if (typeof localStorage !== "undefined") {
         localStorage.setItem(STORAGE_KEY_SHOW_MARKER, "true");
       }
-    });
+    };
 
     // Check if map already initialized (script runs before React hydrates)
     const existing = (window as any).__map as MapInstance | undefined;
@@ -67,6 +66,8 @@ export default function Sidebar() {
       if (showMarker) {
         existing.showUserMarker();
       }
+      // Подписываемся на принудительный показ маркера
+      existing.onMarkerForceShow(onMarkerShow);
       return;
     }
     // Otherwise wait for the event
@@ -78,6 +79,7 @@ export default function Sidebar() {
       if (showMarker) {
         inst.showUserMarker();
       }
+      inst.onMarkerForceShow(onMarkerShow);
     };
     window.addEventListener("map:ready", handler);
     return () => window.removeEventListener("map:ready", handler);
