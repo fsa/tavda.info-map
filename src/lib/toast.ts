@@ -20,7 +20,7 @@ function getContainer(): HTMLElement {
   return el;
 }
 
-function show(message: string, type: "success" | "error" | "info", duration = 4000) {
+function show(message: string, type: "success" | "error" | "info" | "loading", duration = 4000) {
   const container = getContainer();
 
   const toast = document.createElement("div");
@@ -47,4 +47,5 @@ export const toast = {
   success: (msg: string) => show(msg, "success"),
   error: (msg: string) => show(msg, "error"),
   info: (msg: string) => show(msg, "info"),
+  loading: (msg: string) => show(msg, "loading", 0), // 0 = не скрывается автоматически
 };

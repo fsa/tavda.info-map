@@ -216,6 +216,7 @@ export function initMap(containerId: string) {
       toast.error("Геолокация не поддерживается вашим браузером");
       return;
     }
+    toast.loading("Поиск местоположения…");
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;

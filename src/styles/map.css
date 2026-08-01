@@ -70,6 +70,10 @@
   background-color: #2563eb;
 }
 
+.toast-loading {
+  background-color: #f59e0b;
+}
+
 /* User location marker — синий пульсирующий кружок */
 .user-location-marker {
   background: none !important;
