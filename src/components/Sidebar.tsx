@@ -65,8 +65,7 @@ export default function Sidebar() {
 
   const handleFormSubmit = (e: FormEvent) => {
     e.preventDefault();
-    // Form submission only happens on Enter (via handleKeyDown),
-    // not on button click — the button is just a visual indicator.
+    handleSearch();
   };
 
   const sidebarClass = open ? "sidebar sidebar-open" : "sidebar sidebar-closed";
