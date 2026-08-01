@@ -1,7 +1,9 @@
-import { useState, useEffect, useRef, type FormEvent, type KeyboardEvent } from "react";
+import { useState, useEffect, useRef, useCallback, type FormEvent, type KeyboardEvent } from "react";
 import type { MapInstance, MapLayer } from "../lib/map";
 import { LAYERS } from "../lib/layers";
 import { search, type SearchResult } from "../lib/search";
+
+const STORAGE_KEY_SHOW_MARKER = "tavda:showUserMarker";
 
 export default function Sidebar() {
   const [open, setOpen] = useState(false);
@@ -12,12 +14,46 @@ export default function Sidebar() {
   const [searching, setSearching] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Состояние переключателей
+  const [showMarker, setShowMarker] = useState(() => {
+    if (typeof localStorage !== "undefined") {
+      return localStorage.getItem(STORAGE_KEY_SHOW_MARKER) === "true";
+    }
+    return false;
+  });
+  const [liveTracking, setLiveTracking] = useState(false);
+
+  // Синхронизация showMarker с картой и localStorage
+  const syncShowMarker = useCallback((inst: MapInstance, visible: boolean) => {
+    if (visible) {
+      inst.showUserMarker();
+    } else {
+      inst.hideUserMarker();
+    }
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem(STORAGE_KEY_SHOW_MARKER, String(visible));
+    }
+  }, []);
+
+  // Синхронизация liveTracking с картой
+  const syncLiveTracking = useCallback((inst: MapInstance, enabled: boolean) => {
+    if (enabled) {
+      inst.startWatching();
+    } else {
+      inst.stopWatching();
+    }
+  }, []);
+
   useEffect(() => {
     // Check if map already initialized (script runs before React hydrates)
     const existing = (window as any).__map as MapInstance | undefined;
     if (existing) {
       setMapInstance(existing);
       setActiveLayerState(existing.getActiveLayer());
+      // Применяем сохранённую настройку показа маркера
+      if (showMarker) {
+        existing.showUserMarker();
+      }
       return;
     }
     // Otherwise wait for the event
@@ -25,10 +61,14 @@ export default function Sidebar() {
       const inst = (e as CustomEvent).detail as MapInstance;
       setMapInstance(inst);
       setActiveLayerState(inst.getActiveLayer());
+      // Применяем сохранённую настройку показа маркера
+      if (showMarker) {
+        inst.showUserMarker();
+      }
     };
     window.addEventListener("map:ready", handler);
     return () => window.removeEventListener("map:ready", handler);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLayerChange = (layer: MapLayer) => {
     setActiveLayerState(layer);
@@ -170,6 +210,59 @@ export default function Sidebar() {
                 {searchResult.message}
               </div>
             )}
+          </div>
+
+          {/* Geolocation toggles */}
+          <div className="geolocation-section">
+            <label className="toggle-row">
+              <span className="toggle-label">Показать моё местоположение</span>
+              <span
+                className={`toggle-switch${showMarker ? " toggle-switch-on" : ""}`}
+                role="switch"
+                aria-checked={showMarker}
+                tabIndex={0}
+                onClick={() => {
+                  const next = !showMarker;
+                  setShowMarker(next);
+                  if (mapInstance) syncShowMarker(mapInstance, next);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    const next = !showMarker;
+                    setShowMarker(next);
+                    if (mapInstance) syncShowMarker(mapInstance, next);
+                  }
+                }}
+              >
+                <span className="toggle-knob" />
+              </span>
+            </label>
+
+            <label className="toggle-row">
+              <span className="toggle-label">Постоянное отслеживание</span>
+              <span
+                className={`toggle-switch${liveTracking ? " toggle-switch-on" : ""}`}
+                role="switch"
+                aria-checked={liveTracking}
+                tabIndex={0}
+                onClick={() => {
+                  const next = !liveTracking;
+                  setLiveTracking(next);
+                  if (mapInstance) syncLiveTracking(mapInstance, next);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    const next = !liveTracking;
+                    setLiveTracking(next);
+                    if (mapInstance) syncLiveTracking(mapInstance, next);
+                  }
+                }}
+              >
+                <span className="toggle-knob" />
+              </span>
+            </label>
           </div>
         </nav>
       </aside>

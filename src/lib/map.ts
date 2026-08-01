@@ -108,9 +108,12 @@ export function initMap(containerId: string) {
   });
 
   let userMarker: L.Marker | null = null;
+  let watchId: number | null = null;
+  let lastUserCoords: { lat: number; lng: number } | null = null;
 
   /** Обновить или создать маркер пользователя на карте */
   function setUserMarker(lat: number, lng: number) {
+    lastUserCoords = { lat, lng };
     if (userMarker) {
       userMarker.setLatLng([lat, lng]);
     } else {
@@ -118,7 +121,66 @@ export function initMap(containerId: string) {
     }
   }
 
-  // Geolocation
+  /** Показать маркер (если есть координаты) */
+  function showUserMarker() {
+    if (userMarker) {
+      userMarker.addTo(map);
+    } else if (lastUserCoords) {
+      setUserMarker(lastUserCoords.lat, lastUserCoords.lng);
+    }
+  }
+
+  /** Скрыть маркер с карты */
+  function hideUserMarker() {
+    if (userMarker) {
+      map.removeLayer(userMarker);
+    }
+  }
+
+  /** Проверить, виден ли маркер на карте */
+  function isUserMarkerVisible(): boolean {
+    if (!userMarker) return false;
+    return map.hasLayer(userMarker);
+  }
+
+  /** Запустить постоянное отслеживание */
+  function startWatching() {
+    if (!navigator.geolocation) {
+      toast.error("Геолокация не поддерживается вашим браузером");
+      return;
+    }
+    if (watchId !== null) return; // уже отслеживаем
+
+    watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        setUserMarker(latitude, longitude);
+        // Если маркер скрыт — не показываем принудительно
+        if (userMarker && !map.hasLayer(userMarker)) {
+          // ничего не делаем, маркер остаётся скрытым
+        }
+      },
+      (err) => {
+        console.warn("watchPosition error:", err);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 },
+    );
+  }
+
+  /** Остановить постоянное отслеживание */
+  function stopWatching() {
+    if (watchId !== null) {
+      navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+    }
+  }
+
+  /** Проверить, активно ли отслеживание */
+  function isWatching(): boolean {
+    return watchId !== null;
+  }
+
+  // Geolocation (однократное определение)
   function locateUser() {
     if (!navigator.geolocation) {
       toast.error("Геолокация не поддерживается вашим браузером");
@@ -183,7 +245,18 @@ export function initMap(containerId: string) {
     map.flyTo([58.0419, 65.273235], 13, { duration: 1.5 });
   }
 
-  return { map, setActiveLayer, getActiveLayer, flyToTavda };
+  return {
+    map,
+    setActiveLayer,
+    getActiveLayer,
+    flyToTavda,
+    showUserMarker,
+    hideUserMarker,
+    isUserMarkerVisible,
+    startWatching,
+    stopWatching,
+    isWatching,
+  };
 }
 
 export type MapInstance = ReturnType<typeof initMap>;
