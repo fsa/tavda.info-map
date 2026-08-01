@@ -1,4 +1,7 @@
 import { useState, useEffect, useRef, useCallback, type FormEvent, type KeyboardEvent } from "react";
+
+declare const __GIT_HASH__: string;
+declare const __BUILD_TIME__: string;
 import type { MapInstance, MapLayer } from "../lib/map";
 import { LAYERS } from "../lib/layers";
 import { search, type SearchResult } from "../lib/search";
@@ -228,6 +231,12 @@ export default function Sidebar() {
                 {searchResult.message}
               </div>
             )}
+          </div>
+
+          <div className="sidebar-version">
+            {import.meta.env.PROD
+              ? `${__GIT_HASH__} ${__BUILD_TIME__.slice(0, 10)}`
+              : "dev"}
           </div>
         </nav>
       </aside>

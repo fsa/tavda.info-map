@@ -16,6 +16,8 @@
   border-right: 1px solid rgb(229 231 235);
   z-index: 10010;
   transition: transform 0.3s ease-in-out;
+  display: flex;
+  flex-direction: column;
 }
 
 @media (min-width: 768px) {
@@ -106,6 +108,7 @@
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  flex: 1;
 }
 
 .layers-section {
@@ -334,4 +337,14 @@
 
 .geo-btn-disabled:hover {
   background-color: white;
+}
+
+.sidebar-version {
+  margin-top: auto;
+  padding-top: 1rem;
+  font-size: 0.65rem;
+  color: rgb(156 163 175);
+  text-align: center;
+  border-top: 1px solid rgb(243 244 246);
+  user-select: none;
 }
