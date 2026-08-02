@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, type FormEvent, type KeyboardEvent } from "react";
+import { useState, useEffect, useRef, type FormEvent, type KeyboardEvent } from "react";
 
 declare const __GIT_HASH__: string;
 declare const __BUILD_TIME__: string;
@@ -16,24 +16,30 @@ export default function Sidebar() {
   const [searching, setSearching] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Состояние геолокации — читаем напрямую из сервиса при каждом рендере.
-  // Счётчик увеличивается при каждом изменении, форсируя перерендер.
-  const [, forceUpdate] = useState(0);
+  // При гидратации React сравнивает серверный HTML с клиентским рендером.
+  // На сервере localStorage нет → showMarker=false. Чтобы не было ошибки
+  // гидратации, на клиенте при первом рендере тоже показываем false,
+  // а в useEffect читаем реальное состояние из сервиса.
+  const [showMarker, setShowMarker] = useState(false);
+  const [tracking, setTracking] = useState(false);
+  const [followMode, setFollowMode] = useState(false);
+
+  // После гидратации синхронизируемся с сервисом
   useEffect(() => {
-    const unsub = geoService.on(() => {
-      forceUpdate((n) => n + 1);
+    const s = geoService.getState();
+    setShowMarker(s.showMarker);
+    setTracking(s.tracking);
+    setFollowMode(s.followMode);
+  }, []);
+
+  // Подписываемся на изменения сервиса
+  useEffect(() => {
+    const unsub = geoService.on((s) => {
+      setShowMarker(s.showMarker);
+      setTracking(s.tracking);
+      setFollowMode(s.followMode);
     });
     return unsub;
-  }, []);
-  const { showMarker, tracking } = geoService.getState();
-
-  // Синхронизация showMarker с картой
-  const syncShowMarker = useCallback((inst: MapInstance, visible: boolean) => {
-    if (visible) {
-      inst.showUserMarker();
-    } else {
-      inst.hideUserMarker();
-    }
   }, []);
 
   useEffect(() => {
@@ -42,20 +48,12 @@ export default function Sidebar() {
     if (existing) {
       setMapInstance(existing);
       setActiveLayerState(existing.getActiveLayer());
-      // Применяем сохранённую настройку показа маркера
-      if (showMarker) {
-        existing.showUserMarker();
-      }
     } else {
       // Otherwise wait for the event
       const handler = (e: Event) => {
         const inst = (e as CustomEvent).detail as MapInstance;
         setMapInstance(inst);
         setActiveLayerState(inst.getActiveLayer());
-        // Применяем сохранённую настройку показа маркера
-        if (showMarker) {
-          inst.showUserMarker();
-        }
       };
       window.addEventListener("map:ready", handler);
       return () => window.removeEventListener("map:ready", handler);
@@ -166,9 +164,7 @@ export default function Sidebar() {
               <button
                 className={`geo-btn${showMarker ? " geo-btn-active" : ""}`}
                 onClick={() => {
-                  const next = !showMarker;
-                  geoService.setShowMarker(next);
-                  if (mapInstance) syncShowMarker(mapInstance, next);
+                  geoService.setShowMarker(!showMarker);
                 }}
                 title="Показать маркер на карте"
                 aria-pressed={showMarker}
@@ -195,6 +191,14 @@ export default function Sidebar() {
                 </svg>
                 <span>Слежение</span>
               </button>
+            </div>
+            {/* Follow mode indicator */}
+            <div className={`geo-follow-indicator${followMode ? " geo-follow-active" : ""}`}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14">
+                <circle cx="12" cy="12" r="3" strokeWidth="2" />
+                <path strokeWidth="2" strokeLinecap="round" d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+              </svg>
+              <span>{followMode ? "Слежение активно" : "Слежение не активно"}</span>
             </div>
           </div>
 

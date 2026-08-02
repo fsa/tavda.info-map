@@ -4,7 +4,7 @@ import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
 import { LAYERS, type LayerConfig } from "./layers";
-import { geoService } from "./geolocation";
+import { geoService, type GeoState } from "./geolocation";
 
 /** Строковый идентификатор слоя (выводится из LAYERS) */
 export type MapLayer = (typeof LAYERS)[number]["id"];
@@ -109,12 +109,13 @@ export function initMap(containerId: string) {
 
   let userMarker: L.Marker | null = null;
 
-  /** Обновить или создать маркер пользователя на карте */
+  /** Обновить или создать маркер пользователя на карте.
+   *  НЕ добавляет на карту автоматически — видимостью управляют showUserMarker/hideUserMarker. */
   function setUserMarker(lat: number, lng: number) {
     if (userMarker) {
       userMarker.setLatLng([lat, lng]);
     } else {
-      userMarker = L.marker([lat, lng], { icon: userIcon, zIndexOffset: 10000 }).addTo(map);
+      userMarker = L.marker([lat, lng], { icon: userIcon, zIndexOffset: 10000 });
     }
   }
 
@@ -140,8 +141,8 @@ export function initMap(containerId: string) {
 
   // --- Подписка на сервис геолокации ---
 
-  // При изменении состояния — показываем/скрываем маркер, двигаем карту
-  geoService.on((s) => {
+  /** Обработчик изменений состояния геолокации */
+  function onGeoState(s: GeoState) {
     if (s.position) {
       setUserMarker(s.position.lat, s.position.lng);
     }
@@ -153,8 +154,16 @@ export function initMap(containerId: string) {
     // Режим следования — двигаем карту за пользователем
     if (s.followMode && s.position) {
       map.flyTo([s.position.lat, s.position.lng], map.getZoom(), { duration: 0.5 });
+    } else if (s.position && s.showMarker && !s.followMode) {
+      // Однократное перемещение к позиции пользователя (без режима слежения)
+      map.flyTo([s.position.lat, s.position.lng], Math.max(map.getZoom(), 15), { duration: 1 });
     }
-  });
+  }
+
+  // Подписываемся на изменения
+  geoService.on(onGeoState);
+  // Применяем текущее состояние (on() больше не вызывает listener синхронно)
+  onGeoState(geoService.getState());
 
   // Отключаем follow при ручном перемещении карты
   map.on("dragstart", () => {

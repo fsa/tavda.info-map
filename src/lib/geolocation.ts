@@ -45,15 +45,21 @@ class GeolocationService {
       followMode: false,
       position: null,
     };
+
+    // Если пользователь ранее включил маркер — сразу запрашиваем позицию (однократно),
+    // без тостов. Постоянный трекинг включается только по явному действию пользователя.
+    if (stored && typeof navigator !== "undefined" && navigator.geolocation) {
+      this.silentLocate();
+    }
   }
 
   // --- Подписка на изменения состояния ---
 
-  /** Подписаться на изменения состояния */
+  /** Подписаться на изменения состояния.
+   *  НЕ вызывает listener синхронно — подписчик сам читает текущее состояние
+   *  через getState() или через вызов handler после подписки. */
   on(listener: Listener): () => void {
     this.listeners.add(listener);
-    // Немедленно уведомляем с текущим состоянием
-    listener({ ...this.state });
     return () => this.listeners.delete(listener);
   }
 
@@ -84,6 +90,10 @@ class GeolocationService {
     // Если скрываем маркер — отключаем трекинг
     if (!visible && this.state.tracking) {
       this.stopWatching();
+    }
+    // Если включаем маркер, но координат ещё нет — запрашиваем
+    if (visible && !this.state.position && typeof navigator !== "undefined" && navigator.geolocation) {
+      this.silentLocate();
     }
     this.emit();
   }
@@ -155,6 +165,30 @@ class GeolocationService {
           default:
             toast.error("Ошибка геолокации");
         }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
+    );
+  }
+
+  /** Запросить местоположение без тостов (для автозагрузки при старте) */
+  private silentLocate(): void {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude, accuracy, altitude, altitudeAccuracy, heading, speed: speedMs } = pos.coords;
+        this.state.position = {
+          lat: latitude,
+          lng: longitude,
+          accuracy,
+          altitude,
+          altitudeAccuracy,
+          heading,
+          speed: speedMs !== null && speedMs !== undefined ? +(speedMs * 3.6).toFixed(1) : null,
+        };
+        this.emit();
+      },
+      () => {
+        // Ошибку не показываем — это фоновая операция
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
     );

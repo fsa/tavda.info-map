@@ -14,6 +14,11 @@ import "../styles/map.css";
   </div>
 
   <script>
+    // Записываем состояние маркера из localStorage до гидратации React,
+    // чтобы серверный HTML (showMarker=false) был заменён на клиентский.
+    (window as any).__INITIAL_SHOW_MARKER__ =
+      localStorage.getItem("tavda:showUserMarker") === "true";
+
     import { initMap } from "../lib/map";
     const instance = initMap("map");
     (window as any).__map = instance;
