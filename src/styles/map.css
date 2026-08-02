@@ -104,7 +104,7 @@
   }
 }
 
-/* User location marker — стрелка направления (когда есть heading) */
+/* User location marker — стрелка направления движения (GPS heading, синяя) */
 .user-location-heading {
   background: none !important;
   border: none !important;
@@ -121,5 +121,25 @@
   clip-path: polygon(50% 0%, 0% 100%, 50% 75%, 100% 100%);
   border-radius: 2px;
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4);
+  animation: user-location-pulse 1.5s ease-in-out infinite;
+}
+
+/* User location marker — стрелка компаса (зелёная, когда heading только с компаса) */
+.user-location-compass {
+  background: none !important;
+  border: none !important;
+}
+
+.user-location-compass::before {
+  display: none;
+}
+
+.user-compass-arrow {
+  width: 28px;
+  height: 28px;
+  background: #10b981;
+  clip-path: polygon(50% 0%, 0% 100%, 50% 75%, 100% 100%);
+  border-radius: 2px;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.4);
   animation: user-location-pulse 1.5s ease-in-out infinite;
 }

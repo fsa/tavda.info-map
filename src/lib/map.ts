@@ -107,8 +107,8 @@ export function initMap(containerId: string) {
     iconAnchor: [12, 12],
   });
 
-  /** Кастомная divIcon — стрелка направления (когда heading есть) */
-  function createHeadingIcon(heading: number): L.DivIcon {
+  /** Кастомная divIcon — стрелка направления движения (GPS heading, синяя) */
+  function createGpsHeadingIcon(heading: number): L.DivIcon {
     return L.divIcon({
       className: "user-location-marker user-location-heading",
       html: `<div class="user-heading-arrow" style="transform: rotate(${heading}deg)"></div>`,
@@ -117,26 +117,67 @@ export function initMap(containerId: string) {
     });
   }
 
+  /** Кастомная divIcon — стрелка компаса (зелёная, когда heading только с компаса) */
+  function createCompassIcon(heading: number): L.DivIcon {
+    return L.divIcon({
+      className: "user-location-marker user-location-compass",
+      html: `<div class="user-compass-arrow" style="transform: rotate(${heading}deg)"></div>`,
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
+    });
+  }
+
   let userMarker: L.Marker | null = null;
+
+  /** Тип текущей иконки маркера */
+  type MarkerIconType = "dot" | "gps" | "compass";
+
+  /** Определить тип иконки по heading и headingSource */
+  function getMarkerIconType(heading: number | null | undefined, headingSource: string | null | undefined): MarkerIconType {
+    if (heading != null && !isNaN(heading)) {
+      return headingSource === "compass" ? "compass" : "gps";
+    }
+    return "dot";
+  }
 
   /** Обновить или создать маркер пользователя на карте.
    *  Если передан heading (не null) — использует стрелку направления,
    *  иначе — обычный кружок.
+   *  headingSource определяет цвет стрелки: gps — синяя, compass — зелёная.
    *  НЕ добавляет на карту автоматически — видимостью управляют showUserMarker/hideUserMarker. */
-  function setUserMarker(lat: number, lng: number, heading?: number | null) {
-    const hasHeading = heading != null && !isNaN(heading);
-    const newIcon = hasHeading ? createHeadingIcon(heading) : userDotIcon;
+  function setUserMarker(lat: number, lng: number, heading?: number | null, headingSource?: string | null) {
+    const iconType = getMarkerIconType(heading, headingSource);
+    let newIcon: L.DivIcon;
+    switch (iconType) {
+      case "gps":
+        newIcon = createGpsHeadingIcon(heading!);
+        break;
+      case "compass":
+        newIcon = createCompassIcon(heading!);
+        break;
+      default:
+        newIcon = userDotIcon;
+    }
 
     if (userMarker) {
       userMarker.setLatLng([lat, lng]);
-      // Меняем иконку только если изменился тип (кружок ↔ стрелка)
-      const currentIsHeading = userMarker.getIcon().options.className?.includes("user-location-heading");
-      if (hasHeading !== !!currentIsHeading) {
+      // Меняем иконку только если изменился тип
+      const currentType = getCurrentMarkerIconType();
+      if (iconType !== currentType) {
         userMarker.setIcon(newIcon);
       }
     } else {
       userMarker = L.marker([lat, lng], { icon: newIcon, zIndexOffset: 10000 });
     }
+  }
+
+  /** Определить тип текущей иконки на маркере */
+  function getCurrentMarkerIconType(): MarkerIconType {
+    if (!userMarker) return "dot";
+    const className = userMarker.getIcon().options.className || "";
+    if (className.includes("user-location-compass")) return "compass";
+    if (className.includes("user-location-heading")) return "gps";
+    return "dot";
   }
 
   /** Показать маркер (если есть координаты) */
@@ -164,7 +205,7 @@ export function initMap(containerId: string) {
   /** Обработчик изменений состояния геолокации */
   function onGeoState(s: GeoState) {
     if (s.position) {
-      setUserMarker(s.position.lat, s.position.lng, s.position.heading);
+      setUserMarker(s.position.lat, s.position.lng, s.position.heading, s.headingSource);
     }
     if (s.showMarker) {
       showUserMarker();

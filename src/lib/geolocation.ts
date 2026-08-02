@@ -2,6 +2,8 @@ import { toast } from "./toast";
 
 const STORAGE_KEY_SHOW_MARKER = "tavda:showUserMarker";
 
+export type HeadingSource = "gps" | "compass" | null;
+
 export interface GeoPosition {
   lat: number;
   lng: number;
@@ -14,6 +16,8 @@ export interface GeoPosition {
   heading: number | null;
   /** Скорость движения в км/ч (null, если недоступно). Исходные м/с конвертируются * 3.6 */
   speed: number | null;
+  /** Направление по компасу устройства в градусах (null, если недоступно) */
+  compassHeading: number | null;
 }
 
 export interface GeoState {
@@ -25,6 +29,8 @@ export interface GeoState {
   followMode: boolean;
   /** Текущие координаты (null, если ещё не получены) */
   position: GeoPosition | null;
+  /** Источник направления: gps (движение), compass (компас) или null */
+  headingSource: HeadingSource;
 }
 
 type Listener = (state: GeoState) => void;
@@ -33,6 +39,8 @@ class GeolocationService {
   private state: GeoState;
   private watchId: number | null = null;
   private listeners: Set<Listener> = new Set();
+  /** Разрешение на DeviceOrientation уже запрошено */
+  private compassStarted = false;
 
   constructor() {
     const stored = typeof localStorage !== "undefined"
@@ -44,6 +52,7 @@ class GeolocationService {
       tracking: false,
       followMode: false,
       position: null,
+      headingSource: null,
     };
 
     // Если пользователь ранее включил маркер — сразу запрашиваем позицию (однократно),
@@ -122,6 +131,7 @@ class GeolocationService {
     this.emit();
 
     toast.loading("Поиск местоположения…");
+    this.startCompass();
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude, accuracy, altitude, altitudeAccuracy, heading, speed: speedMs } = pos.coords;
@@ -133,7 +143,9 @@ class GeolocationService {
           altitudeAccuracy,
           heading,
           speed: speedMs !== null && speedMs !== undefined ? +(speedMs * 3.6).toFixed(1) : null,
+          compassHeading: this.state.position?.compassHeading ?? null,
         };
+        this.updateHeadingSource();
         this.emit();
 
         toast.dismissAll();
@@ -173,6 +185,7 @@ class GeolocationService {
   /** Запросить местоположение без тостов (для автозагрузки при старте) */
   private silentLocate(): void {
     if (!navigator.geolocation) return;
+    this.startCompass();
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude, accuracy, altitude, altitudeAccuracy, heading, speed: speedMs } = pos.coords;
@@ -184,7 +197,9 @@ class GeolocationService {
           altitudeAccuracy,
           heading,
           speed: speedMs !== null && speedMs !== undefined ? +(speedMs * 3.6).toFixed(1) : null,
+          compassHeading: this.state.position?.compassHeading ?? null,
         };
+        this.updateHeadingSource();
         this.emit();
       },
       () => {
@@ -214,6 +229,7 @@ class GeolocationService {
     this.state.tracking = true;
     this.emit();
 
+    this.startCompass();
     this.watchId = navigator.geolocation.watchPosition(
       (pos) => {
         const { latitude, longitude, accuracy, altitude, altitudeAccuracy, heading, speed: speedMs } = pos.coords;
@@ -225,7 +241,9 @@ class GeolocationService {
           altitudeAccuracy,
           heading,
           speed: speedMs !== null && speedMs !== undefined ? +(speedMs * 3.6).toFixed(1) : null,
+          compassHeading: this.state.position?.compassHeading ?? null,
         };
+        this.updateHeadingSource();
         this.emit();
       },
       (err) => {
@@ -243,6 +261,78 @@ class GeolocationService {
     this.state.tracking = false;
     this.state.followMode = false;
     this.emit();
+  }
+
+  // --- Компас (DeviceOrientationEvent) ---
+
+  /** Запросить доступ к событию ориентации устройства.
+   *  На iOS 13+ требуется явный вызов DeviceOrientationEvent.requestPermission(). */
+  private startCompass(): void {
+    if (this.compassStarted) return;
+    this.compassStarted = true;
+
+    // Проверяем поддержку
+    if (typeof window === "undefined" || !window.DeviceOrientationEvent) {
+      return;
+    }
+
+    const handler = (event: DeviceOrientationEvent) => {
+      // absolute: true — альфа — это азимут относительно севера
+      // Если absolute: false, то альфа может быть относительно произвольного направления
+      let alpha: number | null = null;
+
+      const webkitEvent = event as any;
+      if (webkitEvent.webkitCompassHeading != null) {
+        // iOS: webkitCompassHeading уже является геодезическим азимутом
+        alpha = webkitEvent.webkitCompassHeading;
+      } else if (event.alpha != null && !event.absolute) {
+        // Android: alpha в неабсолютном режиме — это азимут относительно севера
+        alpha = event.alpha;
+      }
+
+      if (alpha == null || isNaN(alpha)) return;
+
+      // Обновляем compassHeading в позиции
+      if (!this.state.position) return;
+      this.state.position = {
+        ...this.state.position,
+        compassHeading: alpha,
+      };
+      this.updateHeadingSource();
+      this.emit();
+    };
+
+    // На iOS 13+ требуется запрос разрешения
+    const DeviceOrientationEventAny = DeviceOrientationEvent as any;
+    if (typeof DeviceOrientationEventAny.requestPermission === "function") {
+      DeviceOrientationEventAny.requestPermission()
+        .then((state: string) => {
+          if (state === "granted") {
+            window.addEventListener("deviceorientation", handler);
+          }
+        })
+        .catch(() => {});
+    } else {
+      // Другие платформы — просто подписываемся
+      window.addEventListener("deviceorientation", handler);
+    }
+  }
+
+  /** Определить источник направления (gps / compass / null) */
+  private updateHeadingSource(): void {
+    const pos = this.state.position;
+    if (!pos) {
+      this.state.headingSource = null;
+      return;
+    }
+    // GPS heading (движение) имеет приоритет
+    if (pos.heading != null && !isNaN(pos.heading)) {
+      this.state.headingSource = "gps";
+    } else if (pos.compassHeading != null && !isNaN(pos.compassHeading)) {
+      this.state.headingSource = "compass";
+    } else {
+      this.state.headingSource = null;
+    }
   }
 }
 
