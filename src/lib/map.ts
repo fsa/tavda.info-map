@@ -100,22 +100,42 @@ export function initMap(containerId: string) {
 
   // --- User location marker ---
 
-  /** Кастомная divIcon — синий пульсирующий кружок */
-  const userIcon = L.divIcon({
+  /** Кастомная divIcon — синий пульсирующий кружок (когда heading отсутствует) */
+  const userDotIcon = L.divIcon({
     className: "user-location-marker",
     iconSize: [24, 24],
     iconAnchor: [12, 12],
   });
 
+  /** Кастомная divIcon — стрелка направления (когда heading есть) */
+  function createHeadingIcon(heading: number): L.DivIcon {
+    return L.divIcon({
+      className: "user-location-marker user-location-heading",
+      html: `<div class="user-heading-arrow" style="transform: rotate(${heading}deg)"></div>`,
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
+    });
+  }
+
   let userMarker: L.Marker | null = null;
 
   /** Обновить или создать маркер пользователя на карте.
+   *  Если передан heading (не null) — использует стрелку направления,
+   *  иначе — обычный кружок.
    *  НЕ добавляет на карту автоматически — видимостью управляют showUserMarker/hideUserMarker. */
-  function setUserMarker(lat: number, lng: number) {
+  function setUserMarker(lat: number, lng: number, heading?: number | null) {
+    const hasHeading = heading != null && !isNaN(heading);
+    const newIcon = hasHeading ? createHeadingIcon(heading) : userDotIcon;
+
     if (userMarker) {
       userMarker.setLatLng([lat, lng]);
+      // Меняем иконку только если изменился тип (кружок ↔ стрелка)
+      const currentIsHeading = userMarker.getIcon().options.className?.includes("user-location-heading");
+      if (hasHeading !== !!currentIsHeading) {
+        userMarker.setIcon(newIcon);
+      }
     } else {
-      userMarker = L.marker([lat, lng], { icon: userIcon, zIndexOffset: 10000 });
+      userMarker = L.marker([lat, lng], { icon: newIcon, zIndexOffset: 10000 });
     }
   }
 
@@ -144,7 +164,7 @@ export function initMap(containerId: string) {
   /** Обработчик изменений состояния геолокации */
   function onGeoState(s: GeoState) {
     if (s.position) {
-      setUserMarker(s.position.lat, s.position.lng);
+      setUserMarker(s.position.lat, s.position.lng, s.position.heading);
     }
     if (s.showMarker) {
       showUserMarker();
