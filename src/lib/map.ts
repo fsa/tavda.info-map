@@ -228,9 +228,10 @@ export function initMap(containerId: string) {
   // Применяем текущее состояние (on() больше не вызывает listener синхронно)
   onGeoState(geoService.getState());
 
-  // Отключаем follow при ручном перемещении карты
+  // Ручное перемещение карты отключает режим слежения полностью,
+  // чтобы кнопка и индикатор показывали реальное состояние
   map.on("dragstart", () => {
-    geoService.disableFollow();
+    geoService.setTracking(false);
   });
 
   // Zoom + locate controls

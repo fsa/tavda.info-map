@@ -214,14 +214,6 @@ class GeolocationService {
     );
   }
 
-  /** Отключить режим следования */
-  disableFollow(): void {
-    if (this.state.followMode) {
-      this.state.followMode = false;
-      this.emit();
-    }
-  }
-
   /** Сбросить флаг однократного центрирования после того, как карта его обработала */
   clearPendingCenter(): void {
     if (this.state.pendingCenter) {
