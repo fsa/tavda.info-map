@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type FormEvent, type KeyboardEvent } from "react";
+import { useState, useEffect, useRef, type FormEvent, type KeyboardEvent, type TransitionEvent } from "react";
 
 declare const __GIT_HASH__: string;
 declare const __BUILD_TIME__: string;
@@ -15,6 +15,9 @@ export default function Sidebar() {
   const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
   const [searching, setSearching] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
+  // true, пока идёт анимация закрытия — чтобы кнопка-гамбургер не мигала раньше времени
+  const [closing, setClosing] = useState(false);
 
   // При гидратации React сравнивает серверный HTML с клиентским рендером.
   // На сервере localStorage нет → showMarker=false. Чтобы не было ошибки
@@ -115,13 +118,27 @@ export default function Sidebar() {
     handleSearch();
   };
 
+  const handleOpen = () => {
+    setOpen(true);
+  };
+
+  const handleClose = () => {
+    setOpen(false);
+    setClosing(true);
+  };
+
+  const handleTransitionEnd = (e: TransitionEvent<HTMLElement>) => {
+    if (e.target !== sidebarRef.current || e.propertyName !== "transform") return;
+    setClosing(false);
+  };
+
   const sidebarClass = open ? "sidebar sidebar-open" : "sidebar sidebar-closed";
 
   return (
     <>
-      {!open && (
+      {!open && !closing && (
         <button
-          onClick={() => setOpen(true)}
+          onClick={handleOpen}
           className="menu-button"
           aria-label="Открыть меню"
         >
@@ -132,10 +149,14 @@ export default function Sidebar() {
       )}
 
       {open && (
-        <div className="overlay" onClick={() => setOpen(false)} aria-hidden />
+        <div className="overlay" onClick={handleClose} aria-hidden />
       )}
 
-      <aside className={sidebarClass}>
+      <aside
+        ref={sidebarRef}
+        className={sidebarClass}
+        onTransitionEnd={handleTransitionEnd}
+      >
         <div className="sidebar-header">
           <div className="sidebar-brand">
             <a href="https://tavda.info" className="sidebar-logo-link" aria-label="На главную Тавда.инфо">
@@ -145,7 +166,7 @@ export default function Sidebar() {
           </div>
           <div className="sidebar-actions">
             <button
-              onClick={() => setOpen(false)}
+              onClick={handleClose}
               className="icon-btn"
               aria-label="Закрыть меню"
               title="Закрыть"
