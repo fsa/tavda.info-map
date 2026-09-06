@@ -2,9 +2,9 @@ import { useState, useEffect, useRef, type FormEvent, type KeyboardEvent } from 
 
 declare const __GIT_HASH__: string;
 declare const __BUILD_TIME__: string;
-import type { MapInstance, MapLayer } from "../lib/map";
+import type { MapInstance, MapLayer, SearchMapPlace } from "../lib/map";
 import { LAYERS } from "../lib/layers";
-import { search, type SearchResult } from "../lib/search";
+import { search, type SearchPlace, type SearchResult } from "../lib/search";
 import { geoService } from "../lib/geolocation";
 
 export default function Sidebar() {
@@ -82,8 +82,25 @@ export default function Sidebar() {
       lng: center?.lng ?? 65.273235,
     });
 
+    const places: SearchMapPlace[] = result.places
+      .filter((p): p is SearchPlace & { coords: NonNullable<SearchPlace["coords"]> } =>
+        p.coords !== null,
+      )
+      .map((p) => ({
+        lat: p.coords.lat,
+        lng: p.coords.lon,
+        name: p.name,
+        addr: p.addr,
+      }));
+    (mapInstance ?? (window as any).__map as MapInstance | undefined)?.showPlaces(places);
+
     setSearchResult(result);
     setSearching(false);
+  };
+
+  const selectResult = (place: SearchPlace) => {
+    if (!place.coords) return;
+    mapInstance?.focusPlace(place.coords.lat, place.coords.lon);
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -230,10 +247,49 @@ export default function Sidebar() {
               <div className="search-status search-status-loading">Поиск…</div>
             )}
 
-            {searchResult && (
+            {searchResult?.message && (
               <div className={`search-status search-status-${searchResult.type}`}>
                 {searchResult.message}
               </div>
+            )}
+
+            {searchResult && searchResult.places.length > 0 && (
+              <ul className="search-results">
+                {searchResult.places.map((place) => (
+                  <li key={place.id}>
+                    <button
+                      type="button"
+                      className="search-result-item"
+                      onClick={() => selectResult(place)}
+                      disabled={!place.coords}
+                      title={place.coords ? "Показать на карте" : "Нет координат"}
+                    >
+                      <svg
+                        className="search-result-pin"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        width="16"
+                        height="16"
+                      >
+                        <path
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7z"
+                        />
+                        <circle cx="12" cy="9" r="2.5" />
+                      </svg>
+                      <span className="search-result-text">
+                        <span className="search-result-name">{place.name}</span>
+                        {place.addr && (
+                          <span className="search-result-addr">{place.addr}</span>
+                        )}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
 

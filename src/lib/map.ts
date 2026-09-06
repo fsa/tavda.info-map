@@ -1,10 +1,18 @@
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
-import markerIcon from "leaflet/dist/images/marker-icon.png";
-import markerShadow from "leaflet/dist/images/marker-shadow.png";
+import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png?url";
+import markerIcon from "leaflet/dist/images/marker-icon.png?url";
+import markerShadow from "leaflet/dist/images/marker-shadow.png?url";
 import { LAYERS, type LayerConfig } from "./layers";
 import { geoService, type GeoState } from "./geolocation";
+
+/** Точка на карте из результатов поиска */
+export interface SearchMapPlace {
+  lat: number;
+  lng: number;
+  name?: string;
+  addr?: string | null;
+}
 
 /** Строковый идентификатор слоя (выводится из LAYERS) */
 export type MapLayer = (typeof LAYERS)[number]["id"];
@@ -275,11 +283,68 @@ export function initMap(containerId: string) {
     map.flyTo([58.0419, 65.273235], 13, { duration: 1.5 });
   }
 
+  // --- Результаты поиска ---
+
+  const escapeHtml = (s: string): string =>
+    s
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+
+  /** Слой со всеми маркерами найденных мест */
+  const placesLayer = L.layerGroup().addTo(map);
+
+  /** Показать все найденные места на карте */
+  function showPlaces(places: SearchMapPlace[]) {
+    placesLayer.clearLayers();
+
+    if (places.length === 0) return;
+
+    const markers = places.map((p) => {
+      const marker = L.marker([p.lat, p.lng]);
+      if (p.name) {
+        const popup = `<strong>${escapeHtml(p.name)}</strong>` +
+          (p.addr ? `<br>${escapeHtml(p.addr)}` : "");
+        marker.bindPopup(popup);
+      }
+      marker.addTo(placesLayer);
+      return marker;
+    });
+
+    if (markers.length === 1) {
+      const m = markers[0].getLatLng();
+      map.flyTo([m.lat, m.lng], Math.max(map.getZoom(), 16), { duration: 0.9 });
+    } else {
+      map.fitBounds(L.featureGroup(markers).getBounds(), {
+        padding: [40, 40],
+        maxZoom: 16,
+      });
+    }
+  }
+
+  /** Приблизить к выбранному месту и открыть попап */
+  function focusPlace(lat: number, lng: number) {
+    map.flyTo([lat, lng], Math.max(map.getZoom(), 17), { duration: 0.9 });
+    placesLayer.eachLayer((l) => {
+      if (
+        l instanceof L.Marker &&
+        l.getLatLng().lat === lat &&
+        l.getLatLng().lng === lng
+      ) {
+        l.openPopup();
+      }
+    });
+  }
+
   return {
     map,
     setActiveLayer,
     getActiveLayer,
     flyToTavda,
+    showPlaces,
+    focusPlace,
     showUserMarker,
     hideUserMarker,
     isUserMarkerVisible,

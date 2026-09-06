@@ -2,18 +2,26 @@
  * Сервис поиска.
  *
  * Отправляет POST-запрос на API с координатами пользователя и текстовым запросом.
- * Обрабатывает ответы:
- *   - 200 → ответ получен, но сервис ещё не готов
- *   - любой другой ответ / сетевая ошибка → сервис на этапе разработки
+ * Бекенд возвращает массив найденных мест (Place).
  */
 
 import { apiClient } from "./api";
 
+/** Одно найденное место */
+export interface SearchPlace {
+  id: number;
+  name: string;
+  addr: string | null;
+  coords: { lat: number; lon: number } | null;
+}
+
 export interface SearchResult {
-  /** Сообщение для отображения пользователю */
-  message: string;
-  /** Тип сообщения: успех / ошибка */
-  type: "info" | "error";
+  /** Найденные места (пусто при ошибке или отсутствии результатов) */
+  places: SearchPlace[];
+  /** Сообщение для отображения пользователю (null при успешном результате) */
+  message: string | null;
+  /** Тип сообщения: успех / информация / ошибка */
+  type: "success" | "info" | "error";
 }
 
 export interface SearchPayload {
@@ -26,27 +34,31 @@ export interface SearchPayload {
  * Выполнить поиск.
  *
  * @param payload - объект с текстом запроса и координатами
- * @returns SearchResult с сообщением для пользователя
+ * @returns SearchResult со списком мест и сообщением для пользователя
  */
 export async function search(payload: SearchPayload): Promise<SearchResult> {
   try {
-    const response = await apiClient.post("", payload);
+    const response = await apiClient.post<SearchPlace[]>("", payload);
+    const places = Array.isArray(response.data) ? response.data : [];
 
-    if (response.status === 200) {
+    if (places.length === 0) {
       return {
-        message: "Ответ получен, но сервис ещё не готов",
+        places: [],
+        message: "Ничего не найдено",
         type: "info",
       };
     }
 
     return {
-      message: "Сервис на этапе разработки",
-      type: "info",
+      places,
+      message: null,
+      type: "success",
     };
-  } catch {
+  } catch (error) {
     return {
-      message: "Сервис на этапе разработки",
-      type: "info",
+      places: [],
+      message: "Поиск временно недоступен",
+      type: "error",
     };
   }
 }
