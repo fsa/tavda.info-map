@@ -104,6 +104,10 @@ export default function Sidebar() {
   const selectResult = (place: SearchPlace) => {
     if (!place.coords) return;
     mapInstance?.focusPlace(place.coords.lat, place.coords.lon);
+    // На мобильных места мало — сворачиваем меню, чтобы был виден результат
+    if (window.matchMedia("(max-width: 767px)").matches) {
+      handleClose();
+    }
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
