@@ -235,7 +235,7 @@ export function initMap(containerId: string) {
   });
 
   // Zoom + locate controls
-  const zoomControl = L.control({ position: "bottomright" });
+  const zoomControl = new L.Control({ position: "bottomright" });
   zoomControl.onAdd = () => {
     const div = L.DomUtil.create("div", "zoom-controls");
     const locateBtn = L.DomUtil.create("button", "zoom-button", div);
