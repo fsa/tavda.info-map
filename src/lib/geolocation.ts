@@ -31,6 +31,9 @@ export interface GeoState {
   position: GeoPosition | null;
   /** Источник направления: gps (движение), compass (компас) или null */
   headingSource: HeadingSource;
+  /** Явный запрос пользователя переместить карту к его позиции ("Найти меня").
+   *  Отличается от фонового определения местоположения при загрузке страницы. */
+  pendingCenter: boolean;
 }
 
 type Listener = (state: GeoState) => void;
@@ -53,6 +56,7 @@ class GeolocationService {
       followMode: false,
       position: null,
       headingSource: null,
+      pendingCenter: false,
     };
 
     // Если пользователь ранее включил маркер — сразу запрашиваем позицию (однократно),
@@ -125,6 +129,7 @@ class GeolocationService {
 
     // Сразу включаем маркер, не дожидаясь ответа
     this.state.showMarker = true;
+    this.state.pendingCenter = true;
     if (typeof localStorage !== "undefined") {
       localStorage.setItem(STORAGE_KEY_SHOW_MARKER, "true");
     }
@@ -213,6 +218,14 @@ class GeolocationService {
   disableFollow(): void {
     if (this.state.followMode) {
       this.state.followMode = false;
+      this.emit();
+    }
+  }
+
+  /** Сбросить флаг однократного центрирования после того, как карта его обработала */
+  clearPendingCenter(): void {
+    if (this.state.pendingCenter) {
+      this.state.pendingCenter = false;
       this.emit();
     }
   }

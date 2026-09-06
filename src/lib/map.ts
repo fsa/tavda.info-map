@@ -215,9 +215,11 @@ export function initMap(containerId: string) {
     // Режим следования — двигаем карту за пользователем
     if (s.followMode && s.position) {
       map.flyTo([s.position.lat, s.position.lng], map.getZoom(), { duration: 0.5 });
-    } else if (s.position && s.showMarker && !s.followMode) {
-      // Однократное перемещение к позиции пользователя (без режима слежения)
+    } else if (s.position && s.pendingCenter) {
+      // Однократное перемещение к позиции — только при явном запросе "Найти меня",
+      // а не при фоновом определении местоположения на загрузке страницы.
       map.flyTo([s.position.lat, s.position.lng], Math.max(map.getZoom(), 15), { duration: 1 });
+      geoService.clearPendingCenter();
     }
   }
 
