@@ -243,6 +243,7 @@ class GeolocationService {
     this.emit();
 
     this.startCompass();
+    let firstFix = true;
     this.watchId = navigator.geolocation.watchPosition(
       (pos) => {
         const { latitude, longitude, accuracy, altitude, altitudeAccuracy, heading, speed: speedMs } = pos.coords;
@@ -257,6 +258,12 @@ class GeolocationService {
           compassHeading: this.state.position?.compassHeading ?? null,
         };
         this.updateHeadingSource();
+        // При включённом отслеживании после первого определения координат
+        // включаем режим следования (карта движется за пользователем).
+        if (firstFix) {
+          firstFix = false;
+          this.state.followMode = true;
+        }
         this.emit();
       },
       (err) => {
