@@ -6,14 +6,6 @@ import markerShadow from "leaflet/dist/images/marker-shadow.png?url";
 import { LAYERS, type LayerConfig } from "./layers";
 import { geoService, type GeoState } from "./geolocation";
 
-/** Точка на карте из результатов поиска */
-export interface SearchMapPlace {
-  lat: number;
-  lng: number;
-  name?: string;
-  addr?: string | null;
-}
-
 /** Строковый идентификатор слоя (выводится из LAYERS) */
 export type MapLayer = (typeof LAYERS)[number]["id"];
 
@@ -293,49 +285,84 @@ export function initMap(containerId: string) {
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#39;");
 
-  /** Слой со всеми маркерами найденных мест */
-  const placesLayer = L.layerGroup().addTo(map);
+  /** Слой с отображаемыми объектами из GeoJSON */
+  const featureLayer = L.layerGroup().addTo(map);
 
-  /** Показать все найденные места на карте */
-  function showPlaces(places: SearchMapPlace[]) {
-    placesLayer.clearLayers();
+  /** Иконка остановки ОТ — голубая круглая метка с автобусом */
+  const stopIcon = L.divIcon({
+    className: "route-stop-marker",
+    html: `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 11V7a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v4a1 1 0 0 1 1 1v3h-1v1a2 2 0 0 1-2 2v1h-2v-1H8v1H6v-1a2 2 0 0 1-2-2v-1H3v-3a1 1 0 0 1 1-1Zm2 0h12V7a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v4Zm1.5 5a1.25 1.25 0 1 0 0-2.5 1.25 1.25 0 0 0 0 2.5Zm11 0a1.25 1.25 0 1 0 0-2.5 1.25 1.25 0 0 0 0 2.5Z"/></svg>`,
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+  });
 
-    if (places.length === 0) return;
-
-    const markers = places.map((p) => {
-      const marker = L.marker([p.lat, p.lng]);
-      if (p.name) {
-        const popup = `<strong>${escapeHtml(p.name)}</strong>` +
-          (p.addr ? `<br>${escapeHtml(p.addr)}` : "");
-        marker.bindPopup(popup);
-      }
-      marker.addTo(placesLayer);
-      return marker;
-    });
-
-    if (markers.length === 1) {
-      const m = markers[0].getLatLng();
-      map.flyTo([m.lat, m.lng], Math.max(map.getZoom(), 16), { duration: 0.9 });
-    } else {
-      map.fitBounds(L.featureGroup(markers).getBounds(), {
-        padding: [40, 40],
-        maxZoom: 16,
-      });
+  /** Первая точка GeoJSON-геометрии любого типа → LatLng */
+  function firstLatLng(geometry: GeoJSON.GeometryObject): L.LatLng | null {
+    const c = (geometry as unknown as { coordinates?: unknown }).coordinates as any;
+    let pos: unknown;
+    switch (geometry.type) {
+      case "Point":
+        pos = c;
+        break;
+      case "LineString":
+      case "MultiPoint":
+        pos = Array.isArray(c) ? c[0] : undefined;
+        break;
+      case "MultiLineString":
+      case "Polygon":
+        pos = Array.isArray(c) ? c[0]?.[0] : undefined;
+        break;
+      case "MultiPolygon":
+        pos = Array.isArray(c) ? c[0]?.[0]?.[0] : undefined;
+        break;
+      default:
+        pos = undefined;
     }
+    if (!Array.isArray(pos) || typeof pos[0] !== "number") return null;
+    return L.latLng(pos[1], pos[0]);
   }
 
-  /** Приблизить к выбранному месту и открыть попап */
-  function focusPlace(lat: number, lng: number) {
-    map.flyTo([lat, lng], Math.max(map.getZoom(), 17), { duration: 0.9 });
-    placesLayer.eachLayer((l) => {
-      if (
-        l instanceof L.Marker &&
-        l.getLatLng().lat === lat &&
-        l.getLatLng().lng === lng
-      ) {
-        l.openPopup();
+  /** Показать найденный объект на карте по его GeoJSON-геометрии */
+  function showFeature(
+    geometry: GeoJSON.GeometryObject | null,
+    name?: string,
+    addr?: string | null,
+    stops?: { name: string | null; geometry: GeoJSON.GeometryObject | null }[],
+  ) {
+    featureLayer.clearLayers();
+    if (!geometry) return;
+
+    const popupContent = `<strong>${escapeHtml(name ?? "")}</strong>` +
+      (addr ? `<br>${escapeHtml(addr)}` : "");
+
+    const layer = L.geoJSON(geometry);
+    layer.addTo(featureLayer);
+
+    // Остановки маршрута — маркеры с отдельной иконкой
+    let anchor: L.LatLng | null = null;
+    (stops ?? []).forEach((s) => {
+      if (!s.geometry) return;
+      const latlng = firstLatLng(s.geometry);
+      if (!latlng) return;
+      if (!anchor) anchor = latlng;
+      const marker = L.marker(latlng, { icon: stopIcon });
+      if (s.name) {
+        marker.bindPopup(`<strong>${escapeHtml(s.name)}</strong>`);
       }
+      marker.addTo(featureLayer);
     });
+
+    const bounds = featureLayer.getBounds();
+    if (bounds.isValid()) {
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 18 });
+    }
+
+    // Попап открываем в реальной точке на объекте (первая остановка / первая точка),
+    // а не в центре границ — у протяжённых маршрутов центр может быть «в никуда»
+    const openAt = anchor ?? firstLatLng(geometry) ?? bounds.getCenter();
+    if (popupContent.trim()) {
+      map.openPopup(popupContent, openAt);
+    }
   }
 
   return {
@@ -343,8 +370,7 @@ export function initMap(containerId: string) {
     setActiveLayer,
     getActiveLayer,
     flyToTavda,
-    showPlaces,
-    focusPlace,
+    showFeature,
     showUserMarker,
     hideUserMarker,
     isUserMarkerVisible,

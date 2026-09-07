@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, type FormEvent, type KeyboardEvent, type T
 
 declare const __GIT_HASH__: string;
 declare const __BUILD_TIME__: string;
-import type { MapInstance, MapLayer, SearchMapPlace } from "../lib/map";
+import type { MapInstance, MapLayer } from "../lib/map";
 import { LAYERS } from "../lib/layers";
 import { search, type SearchPlace, type SearchResult } from "../lib/search";
 import { geoService } from "../lib/geolocation";
@@ -82,28 +82,16 @@ export default function Sidebar() {
     const result = await search({
       query: trimmed,
       lat: center?.lat ?? 58.0419,
-      lng: center?.lng ?? 65.273235,
+      lon: center?.lng ?? 65.273235,
     });
-
-    const places: SearchMapPlace[] = result.places
-      .filter((p): p is SearchPlace & { coords: NonNullable<SearchPlace["coords"]> } =>
-        p.coords !== null,
-      )
-      .map((p) => ({
-        lat: p.coords.lat,
-        lng: p.coords.lon,
-        name: p.name,
-        addr: p.addr,
-      }));
-    (mapInstance ?? (window as any).__map as MapInstance | undefined)?.showPlaces(places);
 
     setSearchResult(result);
     setSearching(false);
   };
 
   const selectResult = (place: SearchPlace) => {
-    if (!place.coords) return;
-    mapInstance?.focusPlace(place.coords.lat, place.coords.lon);
+    if (!place.geometry) return;
+    mapInstance?.showFeature(place.geometry, place.name, place.addr, place.stops);
     // На мобильных места мало — сворачиваем меню, чтобы был виден результат
     if (window.matchMedia("(max-width: 767px)").matches) {
       handleClose();
@@ -286,8 +274,8 @@ export default function Sidebar() {
                       type="button"
                       className="search-result-item"
                       onClick={() => selectResult(place)}
-                      disabled={!place.coords}
-                      title={place.coords ? "Показать на карте" : "Нет координат"}
+                      disabled={!place.geometry}
+                      title={place.geometry ? "Показать на карте" : "Нет геометрии"}
                     >
                       <svg
                         className="search-result-pin"
