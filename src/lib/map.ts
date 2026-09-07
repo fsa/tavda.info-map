@@ -286,7 +286,7 @@ export function initMap(containerId: string) {
       .replaceAll("'", "&#39;");
 
   /** Слой с отображаемыми объектами из GeoJSON */
-  const featureLayer = L.layerGroup().addTo(map);
+  const featureLayer = L.featureGroup().addTo(map);
 
   /** Иконка остановки ОТ — голубая круглая метка с автобусом */
   const stopIcon = L.divIcon({
@@ -353,8 +353,15 @@ export function initMap(containerId: string) {
     });
 
     const bounds = featureLayer.getBounds();
-    if (bounds.isValid()) {
-      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 18 });
+    // Точка: летим прямо на неё с заметным зумом, чтобы выбор был виден даже
+    // если объект далеко или «нечего показать» кроме маркера.
+    if (geometry.type === "Point") {
+      const latlng = firstLatLng(geometry);
+      if (latlng) {
+        map.flyTo(latlng, Math.max(map.getZoom(), 16), { duration: 1.1 });
+      }
+    } else if (bounds.isValid()) {
+      map.flyToBounds(bounds, { padding: [40, 40], maxZoom: 18, duration: 1.1 });
     }
 
     // Попап открываем в реальной точке на объекте (первая остановка / первая точка),

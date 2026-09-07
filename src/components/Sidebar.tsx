@@ -14,6 +14,7 @@ export default function Sidebar() {
   const [query, setQuery] = useState("");
   const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
   const [searching, setSearching] = useState(false);
+  const [selected, setSelected] = useState<SearchPlace | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
   // true, пока идёт анимация закрытия — чтобы кнопка-гамбургер не мигала раньше времени
@@ -74,6 +75,7 @@ export default function Sidebar() {
 
     setSearching(true);
     setSearchResult(null);
+    setSelected(null);
 
     // Получаем текущие координаты карты
     const map = (window as any).__map as MapInstance | undefined;
@@ -91,6 +93,7 @@ export default function Sidebar() {
 
   const selectResult = (place: SearchPlace) => {
     if (!place.geometry) return;
+    setSelected(place);
     mapInstance?.showFeature(place.geometry, place.name, place.addr, place.stops);
     // На мобильных места мало — сворачиваем меню, чтобы был виден результат
     if (window.matchMedia("(max-width: 767px)").matches) {
@@ -126,6 +129,10 @@ export default function Sidebar() {
 
   const sidebarClass = open ? "sidebar sidebar-open" : "sidebar sidebar-closed";
 
+  // Панель описания видна, когда не перекрыта открытым на мобильных меню
+  const wide =
+    typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches;
+
   return (
     <>
       {!open && !closing && (
@@ -138,6 +145,27 @@ export default function Sidebar() {
             <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M4 7h16M4 12h16M4 17h16" />
           </svg>
         </button>
+      )}
+
+      {selected && (wide || !open) && (
+        <div className="selected-object-bar">
+          <div className="selected-object-info">
+            <span className="selected-object-name">{selected.name}</span>
+            {selected.addr && (
+              <span className="selected-object-addr">{selected.addr}</span>
+            )}
+          </div>
+          <button
+            type="button"
+            className="selected-object-close"
+            onClick={() => setSelected(null)}
+            aria-label="Скрыть описание"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="16" height="16">
+              <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
       )}
 
       {open && (
