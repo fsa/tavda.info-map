@@ -12,9 +12,12 @@ import { apiClient } from "./api";
 /** Точка в GeoJSON: [lon, lat] */
 type GisPosition = [number, number];
 
+/** GeoJSON Point */
+export type GisPoint = { type: "Point"; coordinates: GisPosition };
+
 /** Геометрии, которые возвращает бекенд (GeoJSON) */
 export type GisGeometry =
-  | { type: "Point"; coordinates: GisPosition }
+  | GisPoint
   | { type: "LineString"; coordinates: GisPosition[] }
   | { type: "MultiLineString"; coordinates: GisPosition[][] }
   | { type: "Polygon"; coordinates: GisPosition[][] }
@@ -24,6 +27,8 @@ export type GisGeometry =
 export interface SearchPlaceStop {
   name: string | null;
   geometry: GisGeometry | null;
+  /** Точка для маркера остановки (если есть) */
+  labelPoint?: GisPoint | null;
 }
 
 /** Тип найденного объекта — определяет выбор иконки на карте и в списке */
@@ -44,6 +49,8 @@ export interface SearchPlace {
   geometry: GisGeometry | null;
   /** Остановки маршрута (только у маршрутов ОТ) */
   stops?: SearchPlaceStop[];
+  /** Точка для маркера объекта (имени) */
+  labelPoint?: GisPoint | null;
   /** Тип объекта — используется для выбора иконки */
   type: PlaceType;
   /** Категория POI (например "cafe", "shop", "hospital"), только для type === "poi" */
@@ -73,6 +80,8 @@ interface SearchStreet {
   highway?: string | null;
   settlement?: string | null;
   geometry: GisGeometry;
+  /** Точка для маркера названия объекта */
+  label_point?: GisPoint | null;
 }
 
 interface SearchSettlement {
@@ -81,6 +90,7 @@ interface SearchSettlement {
   display_name: string | null;
   official_status?: string | null;
   geometry: GisGeometry;
+  label_point?: GisPoint | null;
 }
 
 interface SearchBuilding {
@@ -91,6 +101,7 @@ interface SearchBuilding {
   settlement?: string | null;
   full_name: string | null;
   geometry: GisGeometry;
+  label_point?: GisPoint | null;
 }
 
 interface SearchPoi {
@@ -100,6 +111,7 @@ interface SearchPoi {
   category: string;
   category_label?: string;
   geometry: GisGeometry;
+  label_point?: GisPoint | null;
 }
 
 interface SearchStop {
@@ -110,6 +122,7 @@ interface SearchStop {
   /** Номера маршрутов (ref), обслуживающих остановку */
   routes: string[];
   geometry: GisGeometry;
+  label_point?: GisPoint | null;
 }
 
 interface SearchRoute {
@@ -121,6 +134,7 @@ interface SearchRoute {
   operator: string | null;
   stops: SearchStop[];
   geometry: GisGeometry;
+  label_point?: GisPoint | null;
 }
 
 interface GisApiResponse {
@@ -164,6 +178,7 @@ export async function search(payload: SearchPayload): Promise<SearchResult> {
         name: b.full_name ?? `${b.street ?? ""} ${b.housenumber ?? ""}`.trim(),
         addr: b.settlement ?? null,
         geometry: b.geometry ?? null,
+        labelPoint: b.label_point ?? null,
         type: "building",
       });
     });
@@ -174,7 +189,12 @@ export async function search(payload: SearchPayload): Promise<SearchResult> {
         name: routeName(r),
         addr: [r.from, r.to].filter(Boolean).join(" — ") || r.operator || null,
         geometry: r.geometry ?? null,
-        stops: r.stops.map((s) => ({ name: s.name, geometry: s.geometry ?? null })),
+        stops: r.stops.map((s) => ({
+          name: s.name,
+          geometry: s.geometry ?? null,
+          labelPoint: s.label_point ?? null,
+        })),
+        labelPoint: r.label_point ?? null,
         type: "route",
       });
     });
@@ -185,6 +205,7 @@ export async function search(payload: SearchPayload): Promise<SearchResult> {
         name: s.name ?? "Остановка",
         addr: s.routes.length > 0 ? `Маршруты: ${s.routes.join(", ")}` : null,
         geometry: s.geometry ?? null,
+        labelPoint: s.label_point ?? null,
         type: "stop",
       });
     });
@@ -195,6 +216,7 @@ export async function search(payload: SearchPayload): Promise<SearchResult> {
         name: s.display_name ?? s.name,
         addr: s.official_status ?? null,
         geometry: s.geometry ?? null,
+        labelPoint: s.label_point ?? null,
         type: "settlement",
       });
     });
@@ -205,6 +227,7 @@ export async function search(payload: SearchPayload): Promise<SearchResult> {
         name: street.full_name ?? street.name ?? "Улица",
         addr: street.settlement ?? null,
         geometry: street.geometry ?? null,
+        labelPoint: street.label_point ?? null,
         type: "street",
       });
     });
@@ -216,6 +239,7 @@ export async function search(payload: SearchPayload): Promise<SearchResult> {
         name: name ?? "Объект",
         addr: name ? (p.category_label ?? null) : null,
         geometry: p.geometry ?? null,
+        labelPoint: p.label_point ?? null,
         type: "poi",
         category: p.category ?? undefined,
       });

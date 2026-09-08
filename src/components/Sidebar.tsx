@@ -69,7 +69,7 @@ export default function Sidebar() {
   const selectResult = (place: SearchPlace) => {
     if (!place.geometry) return;
     setSelected(place);
-    mapInstance?.showFeature(place.geometry, place.name, place.addr, place.stops, place.type, place.category);
+    mapInstance?.showFeature(place.geometry, place.name, place.addr, place.stops, place.type, place.category, place.labelPoint);
     // На мобильных места мало — сворачиваем меню, чтобы был виден результат
     if (window.matchMedia("(max-width: 767px)").matches) {
       handleClose();

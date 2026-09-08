@@ -334,14 +334,16 @@ export function initMap(containerId: string) {
     return L.latLng(pos[1], pos[0]);
   }
 
-  /** Показать найденный объект на карте по его GeoJSON-геометрии */
+  /** Показать найденный объект на карте по его GeoJSON-геометрии и точке-метке.
+   *  geometry рисует контуры/линии, а маркер с названием ставится в labelPoint. */
   function showFeature(
     geometry: GeoJSON.GeometryObject | null,
     name?: string,
     addr?: string | null,
-    stops?: { name: string | null; geometry: GeoJSON.GeometryObject | null }[],
+    stops?: { name: string | null; geometry: GeoJSON.GeometryObject | null; labelPoint?: GeoJSON.Point | null }[],
     placeType?: PlaceType,
     category?: string,
+    labelPoint?: GeoJSON.Point | null,
   ) {
     featureLayer.clearLayers();
     if (!geometry) return;
@@ -349,12 +351,13 @@ export function initMap(containerId: string) {
     const popupContent = `<strong>${escapeHtml(name ?? "")}</strong>` +
       (addr ? `<br>${escapeHtml(addr)}` : "");
 
-    // Точка — маркер с иконкой по типу объекта (без дефолтного значка Leaflet).
-    // Для остальных геометрий дефолтные маркеры отключаем через pointToLayer.
+    const pt = placeType ?? "poi";
+
+    // Геометрия-точка: рисуем только маркер объекта (в labelPoint или в самой точке),
+    // без отрисовки контура — иначе получится дубль маркера.
     if (geometry.type === "Point") {
-      const latlng = firstLatLng(geometry);
+      const latlng = firstLatLng(labelPoint ?? geometry);
       if (latlng) {
-        const pt = placeType ?? "poi";
         const marker = L.marker(latlng, { icon: getIconForPlace(pt, category) });
         if (popupContent.trim()) {
           marker.bindPopup(popupContent);
@@ -368,17 +371,19 @@ export function initMap(containerId: string) {
       return;
     }
 
+    // Контуры/линии — рисуем геометрию (дефолтные маркеры отключены)
     const layer = L.geoJSON(geometry, {
       pointToLayer: (_, latlng) =>
-        L.marker(latlng, { icon: getIconForPlace(placeType ?? "poi", category) }),
+        L.marker(latlng, { icon: getIconForPlace(pt, category) }),
     });
     layer.addTo(featureLayer);
 
-    // Остановки маршрута — маркеры с иконкой типа «stop»
+    // Остановки маршрута — маркеры с иконкой «stop» в label_point остановки
     let anchor: L.LatLng | null = null;
     (stops ?? []).forEach((s) => {
-      if (!s.geometry) return;
-      const latlng = firstLatLng(s.geometry);
+      const src = s.labelPoint ?? s.geometry;
+      if (!src) return;
+      const latlng = firstLatLng(src);
       if (!latlng) return;
       if (!anchor) anchor = latlng;
       const marker = L.marker(latlng, { icon: getIconForPlace("stop") });
@@ -388,14 +393,24 @@ export function initMap(containerId: string) {
       marker.addTo(featureLayer);
     });
 
+    // Маркер имени объекта — в label_point
+    const mainLatLng = labelPoint ? firstLatLng(labelPoint) : null;
+    if (mainLatLng) {
+      const marker = L.marker(mainLatLng, { icon: getIconForPlace(pt, category) });
+      if (popupContent.trim()) {
+        marker.bindPopup(popupContent);
+      }
+      marker.addTo(featureLayer);
+    }
+
     const bounds = featureLayer.getBounds();
     if (bounds.isValid()) {
       map.flyToBounds(bounds, { padding: [40, 40], maxZoom: 18, duration: 1.1 });
     }
 
-    // Попап открываем в реальной точке на объекте (первая остановка / первая точка),
+    // Попап открываем в точке маркера / первой остановки / первой точки геометрии,
     // а не в центре границ — у протяжённых маршрутов центр может быть «в никуда»
-    const openAt = anchor ?? firstLatLng(geometry) ?? bounds.getCenter();
+    const openAt = mainLatLng ?? anchor ?? firstLatLng(geometry) ?? bounds.getCenter();
     if (popupContent.trim()) {
       map.openPopup(popupContent, openAt);
     }
