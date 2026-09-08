@@ -235,12 +235,16 @@ export default function Sidebar() {
                 <span>Метка</span>
               </button>
               <button
-                className={`geo-btn${tracking ? " geo-btn-active" : ""}${!showMarker ? " geo-btn-disabled" : ""}`}
+                className={`geo-btn${tracking ? " geo-btn-active" : ""}${followMode ? " geo-btn-follow" : ""}${!showMarker ? " geo-btn-disabled" : ""}`}
                 onClick={() => {
                   if (!showMarker) return;
                   geoService.setTracking(!tracking);
                 }}
-                title={showMarker ? "Постоянное отслеживание местоположения" : "Сначала включите метку"}
+                title={showMarker
+                  ? followMode
+                    ? "Слежение активно, карта следует за вами"
+                    : "Постоянное отслеживание местоположения"
+                  : "Сначала включите метку"}
                 aria-pressed={tracking}
                 disabled={!showMarker}
               >
@@ -250,14 +254,6 @@ export default function Sidebar() {
                 </svg>
                 <span>Слежение</span>
               </button>
-            </div>
-            {/* Follow mode indicator */}
-            <div className={`geo-follow-indicator${followMode ? " geo-follow-active" : ""}`}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14">
-                <circle cx="12" cy="12" r="3" strokeWidth="2" />
-                <path strokeWidth="2" strokeLinecap="round" d="M12 2v4M12 18v4M2 12h4M18 12h4" />
-              </svg>
-              <span>{followMode ? "Слежение активно" : "Слежение не активно"}</span>
             </div>
           </div>
 
