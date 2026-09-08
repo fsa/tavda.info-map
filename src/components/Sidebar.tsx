@@ -1,22 +1,18 @@
-import { useState, useEffect, useRef, type FormEvent, type KeyboardEvent, type TransitionEvent } from "react";
+import { useState, useEffect, useRef, type TransitionEvent } from "react";
 
 declare const __GIT_HASH__: string;
 declare const __BUILD_TIME__: string;
 import type { MapInstance, MapLayer } from "../lib/map";
 import { LAYERS } from "../lib/layers";
-import { search, type SearchPlace, type SearchResult } from "../lib/search";
+import type { SearchPlace } from "../lib/search";
 import { geoService } from "../lib/geolocation";
-import { getMarkerSvg, getMarkerClass } from "../lib/icons";
+import SearchPanel from "./SearchPanel";
 
 export default function Sidebar() {
   const [open, setOpen] = useState(false);
   const [activeLayer, setActiveLayerState] = useState<MapLayer>("osm");
   const [mapInstance, setMapInstance] = useState<MapInstance | null>(null);
-  const [query, setQuery] = useState("");
-  const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
-  const [searching, setSearching] = useState(false);
   const [selected, setSelected] = useState<SearchPlace | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
   // true, пока идёт анимация закрытия — чтобы кнопка-гамбургер не мигала раньше времени
   const [closing, setClosing] = useState(false);
@@ -70,28 +66,6 @@ export default function Sidebar() {
     mapInstance?.setActiveLayer(layer);
   };
 
-  const handleSearch = async () => {
-    const trimmed = query.trim();
-    if (!trimmed) return;
-
-    setSearching(true);
-    setSearchResult(null);
-    setSelected(null);
-
-    // Получаем текущие координаты карты
-    const map = (window as any).__map as MapInstance | undefined;
-    const center = map?.map.getCenter();
-
-    const result = await search({
-      query: trimmed,
-      lat: center?.lat ?? 58.0419,
-      lon: center?.lng ?? 65.273235,
-    });
-
-    setSearchResult(result);
-    setSearching(false);
-  };
-
   const selectResult = (place: SearchPlace) => {
     if (!place.geometry) return;
     setSelected(place);
@@ -100,18 +74,6 @@ export default function Sidebar() {
     if (window.matchMedia("(max-width: 767px)").matches) {
       handleClose();
     }
-  };
-
-  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      handleSearch();
-    }
-  };
-
-  const handleFormSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    handleSearch();
   };
 
   const handleOpen = () => {
@@ -257,67 +219,10 @@ export default function Sidebar() {
             </div>
           </div>
 
-          <div className="search-wrapper">
-            <label className="search-label">Поиск</label>
-            <form className="search-form" onSubmit={handleFormSubmit}>
-              <input
-                ref={inputRef}
-                type="text"
-                placeholder="Поиск"
-                className="search-input"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={handleKeyDown}
-              />
-              <button
-                type="submit"
-                className="search-submit-btn"
-                aria-label="Найти"
-                tabIndex={-1}
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="18" height="18">
-                  <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z" />
-                </svg>
-              </button>
-            </form>
-
-            {searching && (
-              <div className="search-status search-status-loading">Поиск…</div>
-            )}
-
-            {searchResult?.message && (
-              <div className={`search-status search-status-${searchResult.type}`}>
-                {searchResult.message}
-              </div>
-            )}
-
-            {searchResult && searchResult.places.length > 0 && (
-              <ul className="search-results">
-                {searchResult.places.map((place) => (
-                  <li key={place.id}>
-                    <button
-                      type="button"
-                      className="search-result-item"
-                      onClick={() => selectResult(place)}
-                      disabled={!place.geometry}
-                      title={place.geometry ? "Показать на карте" : "Нет геометрии"}
-                    >
-                      <span
-                        className={getMarkerClass(place.type, place.category)}
-                        dangerouslySetInnerHTML={{ __html: getMarkerSvg(place.type, place.category) }}
-                      />
-                      <span className="search-result-text">
-                        <span className="search-result-name">{place.name}</span>
-                        {place.addr && (
-                          <span className="search-result-addr">{place.addr}</span>
-                        )}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          <SearchPanel
+            onSelect={selectResult}
+            onSearchStart={() => setSelected(null)}
+          />
 
           <div className="sidebar-version">
             {import.meta.env.PROD
