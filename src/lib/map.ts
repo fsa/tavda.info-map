@@ -349,7 +349,29 @@ export function initMap(containerId: string) {
     const popupContent = `<strong>${escapeHtml(name ?? "")}</strong>` +
       (addr ? `<br>${escapeHtml(addr)}` : "");
 
-    const layer = L.geoJSON(geometry);
+    // Точка — маркер с иконкой по типу объекта (без дефолтного значка Leaflet).
+    // Для остальных геометрий дефолтные маркеры отключаем через pointToLayer.
+    if (geometry.type === "Point") {
+      const latlng = firstLatLng(geometry);
+      if (latlng) {
+        const pt = placeType ?? "poi";
+        const marker = L.marker(latlng, { icon: getIconForPlace(pt, category) });
+        if (popupContent.trim()) {
+          marker.bindPopup(popupContent);
+        }
+        marker.addTo(featureLayer);
+        map.flyTo(latlng, Math.max(map.getZoom(), 16), { duration: 1.1 });
+        if (popupContent.trim()) {
+          map.openPopup(popupContent, latlng);
+        }
+      }
+      return;
+    }
+
+    const layer = L.geoJSON(geometry, {
+      pointToLayer: (_, latlng) =>
+        L.marker(latlng, { icon: getIconForPlace(placeType ?? "poi", category) }),
+    });
     layer.addTo(featureLayer);
 
     // Остановки маршрута — маркеры с иконкой типа «stop»
@@ -365,24 +387,6 @@ export function initMap(containerId: string) {
       }
       marker.addTo(featureLayer);
     });
-
-    // Точка — маркер с иконкой по типу объекта
-    if (geometry.type === "Point") {
-      const latlng = firstLatLng(geometry);
-      if (latlng) {
-        const pt = placeType ?? "poi";
-        const marker = L.marker(latlng, { icon: getIconForPlace(pt, category) });
-        if (popupContent.trim()) {
-          marker.bindPopup(popupContent);
-        }
-        marker.addTo(featureLayer);
-        map.flyTo(latlng, Math.max(map.getZoom(), 16), { duration: 1.1 });
-        if (popupContent.trim()) {
-          map.openPopup(popupContent, latlng);
-        }
-        return;
-      }
-    }
 
     const bounds = featureLayer.getBounds();
     if (bounds.isValid()) {
