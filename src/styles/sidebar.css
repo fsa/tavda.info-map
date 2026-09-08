@@ -376,10 +376,24 @@
   opacity: 0.5;
 }
 
-.search-result-pin {
+/* Маркеры POI в списке результатов — компактная версия */
+.search-result-item .poi-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
-  color: var(--color-primary);
+  width: 1.125rem;
+  height: 1.125rem;
   margin-top: 0.125rem;
+}
+
+.search-result-item .poi-marker svg {
+  width: 100%;
+  height: 100%;
+  padding: 2px;
+  border: 1.5px solid #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
 }
 
 .search-result-text {

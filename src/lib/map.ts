@@ -5,6 +5,8 @@ import markerIcon from "leaflet/dist/images/marker-icon.png?url";
 import markerShadow from "leaflet/dist/images/marker-shadow.png?url";
 import { LAYERS, type LayerConfig } from "./layers";
 import { geoService, type GeoState } from "./geolocation";
+import { getIconKey, getMarkerClass, getMarkerSvg } from "./icons";
+import type { PlaceType } from "./search";
 
 /** Строковый идентификатор слоя (выводится из LAYERS) */
 export type MapLayer = (typeof LAYERS)[number]["id"];
@@ -288,13 +290,23 @@ export function initMap(containerId: string) {
   /** Слой с отображаемыми объектами из GeoJSON */
   const featureLayer = L.featureGroup().addTo(map);
 
-  /** Иконка остановки ОТ — голубая круглая метка с автобусом */
-  const stopIcon = L.divIcon({
-    className: "route-stop-marker",
-    html: `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 11V7a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v4a1 1 0 0 1 1 1v3h-1v1a2 2 0 0 1-2 2v1h-2v-1H8v1H6v-1a2 2 0 0 1-2-2v-1H3v-3a1 1 0 0 1 1-1Zm2 0h12V7a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v4Zm1.5 5a1.25 1.25 0 1 0 0-2.5 1.25 1.25 0 0 0 0 2.5Zm11 0a1.25 1.25 0 1 0 0-2.5 1.25 1.25 0 0 0 0 2.5Z"/></svg>`,
-    iconSize: [22, 22],
-    iconAnchor: [11, 11],
-  });
+  /** Кэш L.DivIcon по ключу подтипа (строятся лениво) */
+  const iconCache = new Map<string, L.DivIcon>();
+
+  /** L.DivIcon для маркера по типу/категории объекта */
+  function getIconForPlace(type: PlaceType, category?: string): L.DivIcon {
+    const key = getIconKey(type, category);
+    const cached = iconCache.get(key);
+    if (cached) return cached;
+    const icon = L.divIcon({
+      className: getMarkerClass(type, category),
+      html: getMarkerSvg(type, category),
+      iconSize: [24, 24],
+      iconAnchor: [12, 12],
+    });
+    iconCache.set(key, icon);
+    return icon;
+  }
 
   /** Первая точка GeoJSON-геометрии любого типа → LatLng */
   function firstLatLng(geometry: GeoJSON.GeometryObject): L.LatLng | null {
@@ -328,6 +340,8 @@ export function initMap(containerId: string) {
     name?: string,
     addr?: string | null,
     stops?: { name: string | null; geometry: GeoJSON.GeometryObject | null }[],
+    placeType?: PlaceType,
+    category?: string,
   ) {
     featureLayer.clearLayers();
     if (!geometry) return;
@@ -338,29 +352,40 @@ export function initMap(containerId: string) {
     const layer = L.geoJSON(geometry);
     layer.addTo(featureLayer);
 
-    // Остановки маршрута — маркеры с отдельной иконкой
+    // Остановки маршрута — маркеры с иконкой типа «stop»
     let anchor: L.LatLng | null = null;
     (stops ?? []).forEach((s) => {
       if (!s.geometry) return;
       const latlng = firstLatLng(s.geometry);
       if (!latlng) return;
       if (!anchor) anchor = latlng;
-      const marker = L.marker(latlng, { icon: stopIcon });
+      const marker = L.marker(latlng, { icon: getIconForPlace("stop") });
       if (s.name) {
         marker.bindPopup(`<strong>${escapeHtml(s.name)}</strong>`);
       }
       marker.addTo(featureLayer);
     });
 
-    const bounds = featureLayer.getBounds();
-    // Точка: летим прямо на неё с заметным зумом, чтобы выбор был виден даже
-    // если объект далеко или «нечего показать» кроме маркера.
+    // Точка — маркер с иконкой по типу объекта
     if (geometry.type === "Point") {
       const latlng = firstLatLng(geometry);
       if (latlng) {
+        const pt = placeType ?? "poi";
+        const marker = L.marker(latlng, { icon: getIconForPlace(pt, category) });
+        if (popupContent.trim()) {
+          marker.bindPopup(popupContent);
+        }
+        marker.addTo(featureLayer);
         map.flyTo(latlng, Math.max(map.getZoom(), 16), { duration: 1.1 });
+        if (popupContent.trim()) {
+          map.openPopup(popupContent, latlng);
+        }
+        return;
       }
-    } else if (bounds.isValid()) {
+    }
+
+    const bounds = featureLayer.getBounds();
+    if (bounds.isValid()) {
       map.flyToBounds(bounds, { padding: [40, 40], maxZoom: 18, duration: 1.1 });
     }
 

@@ -144,21 +144,39 @@
   animation: user-location-pulse 1.5s ease-in-out infinite;
 }
 
-/* Остановка ОТ — круглая голубая метка с автобусом */
-.route-stop-marker {
+/* ── POI-маркеры: цветные кружки с SVG-иконками ────────────────────────── */
+
+.poi-marker {
   background: none !important;
   border: none !important;
 }
 
-.route-stop-marker svg {
+.poi-marker svg {
   display: block;
   width: 100%;
   height: 100%;
-  padding: 3px;
+  padding: 4px;
   box-sizing: border-box;
   color: #ffffff;
-  background: #0ea5e9;
   border: 2px solid #ffffff;
   border-radius: 50%;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
 }
+
+/* Фоновые цвета для каждого подтипа */
+.poi-marker-building svg  { background: #78716c; }
+.poi-marker-route svg     { background: #8b5cf6; }
+.poi-marker-stop svg      { background: #0ea5e9; }
+.poi-marker-settlement svg { background: #f59e0b; }
+.poi-marker-street svg    { background: #64748b; }
+.poi-marker-poi svg       { background: #ef4444; }
+.poi-marker-food svg      { background: #f97316; }
+.poi-marker-shop svg      { background: #ec4899; }
+.poi-marker-health svg    { background: #ef4444; }
+.poi-marker-education svg { background: #3b82f6; }
+.poi-marker-culture svg   { background: #a855f7; }
+.poi-marker-fuel svg      { background: #eab308; }
+.poi-marker-finance svg   { background: #14b8a6; }
+.poi-marker-accommodation svg { background: #6366f1; }
+.poi-marker-sport svg     { background: #22c55e; }
+.poi-marker-service svg   { background: #0ea5e9; }

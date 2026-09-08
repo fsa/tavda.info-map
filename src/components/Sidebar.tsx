@@ -6,6 +6,7 @@ import type { MapInstance, MapLayer } from "../lib/map";
 import { LAYERS } from "../lib/layers";
 import { search, type SearchPlace, type SearchResult } from "../lib/search";
 import { geoService } from "../lib/geolocation";
+import { getMarkerSvg, getMarkerClass } from "../lib/icons";
 
 export default function Sidebar() {
   const [open, setOpen] = useState(false);
@@ -94,7 +95,7 @@ export default function Sidebar() {
   const selectResult = (place: SearchPlace) => {
     if (!place.geometry) return;
     setSelected(place);
-    mapInstance?.showFeature(place.geometry, place.name, place.addr, place.stops);
+    mapInstance?.showFeature(place.geometry, place.name, place.addr, place.stops, place.type, place.category);
     // На мобильных места мало — сворачиваем меню, чтобы был виден результат
     if (window.matchMedia("(max-width: 767px)").matches) {
       handleClose();
@@ -305,22 +306,10 @@ export default function Sidebar() {
                       disabled={!place.geometry}
                       title={place.geometry ? "Показать на карте" : "Нет геометрии"}
                     >
-                      <svg
-                        className="search-result-pin"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        width="16"
-                        height="16"
-                      >
-                        <path
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7z"
-                        />
-                        <circle cx="12" cy="9" r="2.5" />
-                      </svg>
+                      <span
+                        className={getMarkerClass(place.type, place.category)}
+                        dangerouslySetInnerHTML={{ __html: getMarkerSvg(place.type, place.category) }}
+                      />
                       <span className="search-result-text">
                         <span className="search-result-name">{place.name}</span>
                         {place.addr && (

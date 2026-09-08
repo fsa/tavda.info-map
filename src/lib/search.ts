@@ -26,6 +26,15 @@ export interface SearchPlaceStop {
   geometry: GisGeometry | null;
 }
 
+/** Тип найденного объекта — определяет выбор иконки на карте и в списке */
+export type PlaceType =
+  | "building"
+  | "route"
+  | "stop"
+  | "settlement"
+  | "street"
+  | "poi";
+
 /** Одно найденное место */
 export interface SearchPlace {
   id: number | string;
@@ -35,6 +44,10 @@ export interface SearchPlace {
   geometry: GisGeometry | null;
   /** Остановки маршрута (только у маршрутов ОТ) */
   stops?: SearchPlaceStop[];
+  /** Тип объекта — используется для выбора иконки */
+  type: PlaceType;
+  /** Категория POI (например "cafe", "shop", "hospital"), только для type === "poi" */
+  category?: string;
 }
 
 export interface SearchResult {
@@ -151,6 +164,7 @@ export async function search(payload: SearchPayload): Promise<SearchResult> {
         name: b.full_name ?? `${b.street ?? ""} ${b.housenumber ?? ""}`.trim(),
         addr: b.settlement ?? null,
         geometry: b.geometry ?? null,
+        type: "building",
       });
     });
 
@@ -161,6 +175,7 @@ export async function search(payload: SearchPayload): Promise<SearchResult> {
         addr: [r.from, r.to].filter(Boolean).join(" — ") || r.operator || null,
         geometry: r.geometry ?? null,
         stops: r.stops.map((s) => ({ name: s.name, geometry: s.geometry ?? null })),
+        type: "route",
       });
     });
 
@@ -170,6 +185,7 @@ export async function search(payload: SearchPayload): Promise<SearchResult> {
         name: s.name ?? "Остановка",
         addr: s.routes.length > 0 ? `Маршруты: ${s.routes.join(", ")}` : null,
         geometry: s.geometry ?? null,
+        type: "stop",
       });
     });
 
@@ -179,6 +195,7 @@ export async function search(payload: SearchPayload): Promise<SearchResult> {
         name: s.display_name ?? s.name,
         addr: s.official_status ?? null,
         geometry: s.geometry ?? null,
+        type: "settlement",
       });
     });
 
@@ -188,6 +205,7 @@ export async function search(payload: SearchPayload): Promise<SearchResult> {
         name: street.full_name ?? street.name ?? "Улица",
         addr: street.settlement ?? null,
         geometry: street.geometry ?? null,
+        type: "street",
       });
     });
 
@@ -198,6 +216,8 @@ export async function search(payload: SearchPayload): Promise<SearchResult> {
         name: name ?? "Объект",
         addr: name ? (p.category_label ?? null) : null,
         geometry: p.geometry ?? null,
+        type: "poi",
+        category: p.category ?? undefined,
       });
     });
 
