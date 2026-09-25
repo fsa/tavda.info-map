@@ -5,9 +5,15 @@
  * Бекенд возвращает результат сгруппированный по категориям
  * (streets / settlements / buildings / pois), который конвертируется
  * в единый плоский список мест (Place).
+ *
+ * Поиск не возвращает геометрию — только идентификатор объекта (`ref`)
+ * и точку для маркера (`labelPoint`). Данные для отрисовки (геометрия,
+ * подпись, атрибуты) приходят отдельным запросом — см. geometry.ts.
  */
 
-import { apiClient } from "./api";
+import { apiClient, API } from "./api";
+import { streetAddress } from "./address";
+import type { GeometryRef, MapObject } from "./geometry";
 
 /** Точка в GeoJSON: [lon, lat] */
 type GisPosition = [number, number];
@@ -23,38 +29,35 @@ export type GisGeometry =
   | { type: "Polygon"; coordinates: GisPosition[][] }
   | { type: "MultiPolygon"; coordinates: GisPosition[][][] };
 
-/** Остановка маршрута (для отрисовки на карте) */
+/** Остановка маршрута в результатах поиска */
 export interface SearchPlaceStop {
   name: string | null;
-  geometry: GisGeometry | null;
-  /** Точка для маркера остановки (если есть) */
+  /** Точка для маркера остановки */
   labelPoint?: GisPoint | null;
+  /** Идентификатор для запроса геометрии остановки */
+  ref: GeometryRef;
 }
 
 /** Тип найденного объекта — определяет выбор иконки на карте и в списке */
 export type PlaceType =
-  | "building"
-  | "route"
-  | "stop"
-  | "settlement"
-  | "street"
-  | "poi";
+  "building" | "route" | "stop" | "settlement" | "street" | "poi";
 
-/** Одно найденное место */
+/** Одно найденное место (без геометрии — она грузится отдельно) */
 export interface SearchPlace {
-  id: number | string;
+  /** Ключ результата в списке (уникален в пределах типов) */
+  id: string;
   name: string;
   addr: string | null;
-  /** GeoJSON-геометрия объекта (для отображения на карте) */
-  geometry: GisGeometry | null;
   /** Остановки маршрута (только у маршрутов ОТ) */
-  stops?: SearchPlaceStop[];
+  stops: SearchPlaceStop[];
   /** Точка для маркера объекта (имени) */
   labelPoint?: GisPoint | null;
   /** Тип объекта — используется для выбора иконки */
   type: PlaceType;
   /** Категория POI (например "cafe", "shop", "hospital"), только для type === "poi" */
   category?: string;
+  /** Идентификатор объекта для запроса геометрии (POST /osm/geometry) */
+  ref: GeometryRef;
 }
 
 export interface SearchResult {
@@ -73,34 +76,39 @@ export interface SearchPayload {
 }
 
 // --- Ответ GIS API (см. API.md проекта tavda.info-gis) ---
+//
+// Поиск не возвращает геометрию: только идентификатор объекта
+// и label_point. Геометрия запрашивается отдельно (см. geometry.ts).
 
 interface SearchStreet {
+  /** Собственный ID улицы (min(way_id) сегментов) — не OSM ID */
+  id: number;
   name: string | null;
   full_name: string | null;
   highway?: string | null;
   settlement?: string | null;
-  geometry: GisGeometry;
+  settlement_id?: number | null;
   /** Точка для маркера названия объекта */
   label_point?: GisPoint | null;
 }
 
 interface SearchSettlement {
+  /** OSM node ID */
   id: number;
   name: string;
   display_name: string | null;
   official_status?: string | null;
-  geometry: GisGeometry;
   label_point?: GisPoint | null;
 }
 
 interface SearchBuilding {
+  /** ID в кодировке imposm: node — положительный, way — отрицательный */
   id: number;
   housenumber?: string | null;
   street?: string | null;
   place?: string | null;
   settlement?: string | null;
   full_name: string | null;
-  geometry: GisGeometry;
   label_point?: GisPoint | null;
 }
 
@@ -108,9 +116,12 @@ interface SearchPoi {
   osm_type: string;
   osm_id: number;
   name: string | null;
+  /** Адрес из тегов OSM: есть примерно у 12% точек интереса */
+  street?: string;
+  housenumber?: string;
+  settlement?: string;
   category: string;
   category_label?: string;
-  geometry: GisGeometry;
   label_point?: GisPoint | null;
 }
 
@@ -119,13 +130,16 @@ interface SearchStop {
   osm_id: number;
   kind: string;
   name: string | null;
+  /** Адрес из тегов OSM — есть у единиц платформ */
+  street?: string;
+  housenumber?: string;
   /** Номера маршрутов (ref), обслуживающих остановку */
   routes: string[];
-  geometry: GisGeometry;
   label_point?: GisPoint | null;
 }
 
 interface SearchRoute {
+  /** OSM relation ID (route_master либо id одиночного направления) */
   id: number;
   ref: string | null;
   name: string | null;
@@ -133,7 +147,6 @@ interface SearchRoute {
   to: string | null;
   operator: string | null;
   stops: SearchStop[];
-  geometry: GisGeometry;
   label_point?: GisPoint | null;
 }
 
@@ -150,6 +163,18 @@ interface GisApiResponse {
 }
 
 /** Название маршрута: «Автобус 9: ТФК — Техникум» или «№9 ТФК — Техникум» */
+/** Вторая строка остановки: маршруты, а если есть адрес — он после них */
+function stopAddr(s: SearchStop): string | null {
+  return (
+    [
+      s.routes.length > 0 ? `Маршруты: ${s.routes.join(", ")}` : null,
+      streetAddress(s),
+    ]
+      .filter(Boolean)
+      .join(" · ") || null
+  );
+}
+
 function routeName(r: SearchRoute): string {
   if (r.name) return r.name;
   const parts = [r.ref ? `№${r.ref}` : "", r.from, r.to].filter(Boolean);
@@ -162,11 +187,45 @@ function routeName(r: SearchRoute): string {
  * @param payload - объект с текстом запроса и координатами
  * @returns SearchResult со списком мест и сообщением для пользователя
  */
+/**
+ * Собрать объект для отрисовки только из данных поиска (без геометрии).
+ *
+ * Нужен, чтобы маркер с названием появился на карте мгновенно, не дожидаясь
+ * ответа /osm/geometry. Дальше объект заменяется на полный, из ответа
+ * геометрии, — он и является источником данных для отрисовки.
+ *
+ * @param place - результат поиска
+ * @returns объект для отрисовки без геометрии
+ */
+export function toPreviewObject(place: SearchPlace): MapObject {
+  return {
+    type: place.type,
+    id: place.ref.id,
+    label: place.name,
+    name: place.name,
+    addr: place.addr,
+    geometry: null,
+    labelPoint: place.labelPoint ?? null,
+    ...(place.category ? { category: place.category } : {}),
+    stops: place.stops.map((s) => ({
+      label: s.name,
+      name: s.name,
+      kind: null,
+      geometry: null,
+      labelPoint: s.labelPoint ?? null,
+    })),
+  };
+}
+
 export async function search(payload: SearchPayload): Promise<SearchResult> {
   const { query, lat, lon } = payload;
 
   try {
-    const response = await apiClient.post<GisApiResponse>("", { query, lat, lon });
+    const response = await apiClient.post<GisApiResponse>(API.search, {
+      query,
+      lat,
+      lon,
+    });
     const results = response.data?.results ?? {};
 
     // Порядок вывода: дома → маршруты ОТ → остановки → населённые пункты → улицы → точки интереса
@@ -174,12 +233,13 @@ export async function search(payload: SearchPayload): Promise<SearchResult> {
 
     (results.buildings ?? []).forEach((b) => {
       places.push({
-        id: b.id,
+        id: `building-${b.id}`,
         name: b.full_name ?? `${b.street ?? ""} ${b.housenumber ?? ""}`.trim(),
         addr: b.settlement ?? null,
-        geometry: b.geometry ?? null,
+        stops: [],
         labelPoint: b.label_point ?? null,
         type: "building",
+        ref: { type: "building", id: b.id },
       });
     });
 
@@ -188,14 +248,14 @@ export async function search(payload: SearchPayload): Promise<SearchResult> {
         id: `route-${r.id}`,
         name: routeName(r),
         addr: [r.from, r.to].filter(Boolean).join(" — ") || r.operator || null,
-        geometry: r.geometry ?? null,
         stops: r.stops.map((s) => ({
           name: s.name,
-          geometry: s.geometry ?? null,
           labelPoint: s.label_point ?? null,
+          ref: { type: "stop" as const, id: s.osm_id },
         })),
         labelPoint: r.label_point ?? null,
         type: "route",
+        ref: { type: "route", id: r.id },
       });
     });
 
@@ -203,45 +263,50 @@ export async function search(payload: SearchPayload): Promise<SearchResult> {
       places.push({
         id: `stop-${s.osm_type}-${s.osm_id}`,
         name: s.name ?? "Остановка",
-        addr: s.routes.length > 0 ? `Маршруты: ${s.routes.join(", ")}` : null,
-        geometry: s.geometry ?? null,
+        addr: stopAddr(s),
+        stops: [],
         labelPoint: s.label_point ?? null,
         type: "stop",
+        ref: { type: "stop", id: s.osm_id },
       });
     });
 
     (results.settlements ?? []).forEach((s) => {
       places.push({
-        id: s.id,
+        id: `settlement-${s.id}`,
         name: s.display_name ?? s.name,
         addr: s.official_status ?? null,
-        geometry: s.geometry ?? null,
+        stops: [],
         labelPoint: s.label_point ?? null,
         type: "settlement",
+        ref: { type: "settlement", id: s.id },
       });
     });
 
-    (results.streets ?? []).forEach((street, index) => {
+    (results.streets ?? []).forEach((street) => {
       places.push({
-        id: `street-${index}`,
+        id: `street-${street.id}`,
         name: street.full_name ?? street.name ?? "Улица",
         addr: street.settlement ?? null,
-        geometry: street.geometry ?? null,
+        stops: [],
         labelPoint: street.label_point ?? null,
         type: "street",
+        ref: { type: "street", id: street.id },
       });
     });
 
     (results.pois ?? []).forEach((p) => {
       const name = p.name ?? p.category_label;
       places.push({
-        id: p.osm_id,
+        id: `poi-${p.osm_id}`,
         name: name ?? "Объект",
-        addr: name ? (p.category_label ?? null) : null,
-        geometry: p.geometry ?? null,
+        // Адрес важнее категории: он есть у части POI, категория — у всех
+        addr: streetAddress(p) ?? (name ? (p.category_label ?? null) : null),
+        stops: [],
         labelPoint: p.label_point ?? null,
         type: "poi",
         category: p.category ?? undefined,
+        ref: { type: "poi", id: p.osm_id },
       });
     });
 

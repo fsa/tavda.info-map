@@ -4,7 +4,8 @@ declare const __GIT_HASH__: string;
 declare const __BUILD_TIME__: string;
 import type { MapInstance, MapLayer } from "../lib/map";
 import { LAYERS } from "../lib/layers";
-import type { SearchPlace } from "../lib/search";
+import { toPreviewObject, type SearchPlace } from "../lib/search";
+import { loadObjectByRef, loadPlaceObject, type MapObject } from "../lib/geometry";
 import { geoService } from "../lib/geolocation";
 import SearchPanel from "./SearchPanel";
 
@@ -12,8 +13,12 @@ export default function Sidebar() {
   const [open, setOpen] = useState(false);
   const [activeLayer, setActiveLayerState] = useState<MapLayer>("osm");
   const [mapInstance, setMapInstance] = useState<MapInstance | null>(null);
-  const [selected, setSelected] = useState<SearchPlace | null>(null);
+  // Ссылка на карту: нужна и после await, когда переменная состояния уже устарела
+  const mapRef = useRef<MapInstance | null>(null);
+  const [selected, setSelected] = useState<MapObject | null>(null);
   const sidebarRef = useRef<HTMLElement>(null);
+  // Номер последнего выбора — защита от гонки, пока грузится объект
+  const selectSeqRef = useRef(0);
   // true, пока идёт анимация закрытия — чтобы кнопка-гамбургер не мигала раньше времени
   const [closing, setClosing] = useState(false);
 
@@ -43,18 +48,41 @@ export default function Sidebar() {
     return unsub;
   }, []);
 
+  /** Показать объект на карте и записать его в URL (object=null — убрать) */
+  const display = (object: MapObject | null) => {
+    const map = mapRef.current;
+    setSelected(object);
+    map?.showFeature(object);
+    map?.setObjectParam(object ? { type: object.type, id: object.id } : null);
+  };
+
+  /** Показать объект из ссылки вида «?object=street:129211913» */
+  const restoreFromUrl = (inst: MapInstance) => {
+    const ref = inst.getObjectParam();
+    if (!ref) return;
+    const seq = ++selectSeqRef.current;
+    loadObjectByRef(ref).then((object) => {
+      if (seq !== selectSeqRef.current || !object) return;
+      display(object);
+    });
+  };
+
   useEffect(() => {
     // Check if map already initialized (script runs before React hydrates)
     const existing = (window as any).__map as MapInstance | undefined;
     if (existing) {
+      mapRef.current = existing;
       setMapInstance(existing);
       setActiveLayerState(existing.getActiveLayer());
+      restoreFromUrl(existing);
     } else {
       // Otherwise wait for the event
       const handler = (e: Event) => {
         const inst = (e as CustomEvent).detail as MapInstance;
+        mapRef.current = inst;
         setMapInstance(inst);
         setActiveLayerState(inst.getActiveLayer());
+        restoreFromUrl(inst);
       };
       window.addEventListener("map:ready", handler);
       return () => window.removeEventListener("map:ready", handler);
@@ -66,14 +94,24 @@ export default function Sidebar() {
     mapInstance?.setActiveLayer(layer);
   };
 
-  const selectResult = (place: SearchPlace) => {
-    if (!place.geometry) return;
-    setSelected(place);
-    mapInstance?.showFeature(place.geometry, place.name, place.addr, place.stops, place.type, place.category, place.labelPoint);
+  const selectResult = async (place: SearchPlace) => {
+    // Метка выбора: пока грузится объект, пользователь может выбрать другой
+    // — тогда результат устаревшего запроса игнорируем
+    const seq = ++selectSeqRef.current;
+    // Маркер по label_point рисуется сразу по данным поиска, полный объект
+    // с геометрией и подписью приходит следом
+    display(toPreviewObject(place));
     // На мобильных места мало — сворачиваем меню, чтобы был виден результат
     if (window.matchMedia("(max-width: 767px)").matches) {
       handleClose();
     }
+
+    // Данные для отрисовки берём из ответа /osm/geometry — он самодостаточен:
+    // геометрия, подпись (label) и атрибуты объекта
+    const object = await loadPlaceObject(place);
+    if (seq !== selectSeqRef.current || !object) return;
+
+    display(object);
   };
 
   const handleOpen = () => {
@@ -113,7 +151,9 @@ export default function Sidebar() {
       {selected && (wide || !open) && (
         <div className="selected-object-bar">
           <div className="selected-object-info">
-            <span className="selected-object-name">{selected.name}</span>
+            <span className="selected-object-name">
+              {selected.label ?? selected.name}
+            </span>
             {selected.addr && (
               <span className="selected-object-addr">{selected.addr}</span>
             )}
@@ -121,7 +161,10 @@ export default function Sidebar() {
           <button
             type="button"
             className="selected-object-close"
-            onClick={() => setSelected(null)}
+            onClick={() => {
+              selectSeqRef.current++;
+              display(null);
+            }}
             aria-label="Скрыть описание"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="16" height="16">
@@ -221,7 +264,10 @@ export default function Sidebar() {
 
           <SearchPanel
             onSelect={selectResult}
-            onSearchStart={() => setSelected(null)}
+            onSearchStart={() => {
+              selectSeqRef.current++;
+              display(null);
+            }}
           />
 
           <div className="sidebar-version">

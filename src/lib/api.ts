@@ -11,12 +11,12 @@
 
 import axios from "axios";
 
-/** Базовый URL из переменной окружения (Astro делает PUBLIC_* доступными на клиенте) */
-const BASE_URL = import.meta.env.PUBLIC_API_URL as string;
+/** Базовый URL API из переменной окружения (Astro делает PUBLIC_* доступными на клиенте) */
+const BASE_URL = (import.meta.env.PUBLIC_API_BASE as string)?.replace(/\/+$/, "");
 
 if (!BASE_URL) {
   throw new Error(
-    "PUBLIC_API_URL не задан. Добавьте PUBLIC_API_URL в .env файл.",
+    "PUBLIC_API_BASE не задан. Добавьте PUBLIC_API_BASE в .env файл.",
   );
 }
 
@@ -27,6 +27,14 @@ export const apiClient = axios.create({
     "Content-Type": "application/json",
   },
 });
+
+/** Адреса эндпоинтов API */
+export const API = {
+  /** Нечёткий поиск: список объектов с идентификаторами и label_point (без геометрии) */
+  search: "osm/search",
+  /** Геометрия (GeoJSON) по идентификаторам из поиска */
+  geometry: "osm/geometry",
+} as const;
 
 // --- Точка расширения: интерцепторы ---
 

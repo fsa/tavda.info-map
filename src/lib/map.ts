@@ -6,6 +6,12 @@ import markerShadow from "leaflet/dist/images/marker-shadow.png?url";
 import { LAYERS, type LayerConfig } from "./layers";
 import { geoService, type GeoState } from "./geolocation";
 import { getIconKey, getMarkerClass, getMarkerSvg } from "./icons";
+import {
+  formatObjectParam,
+  parseObjectParam,
+  type GeometryRef,
+  type MapObject,
+} from "./geometry";
 import type { PlaceType } from "./search";
 
 /** Строковый идентификатор слоя (выводится из LAYERS) */
@@ -31,15 +37,24 @@ function readParams() {
     lng: parseFloat(p.get("lng") || "65.273235"),
     zoom: parseInt(p.get("zoom") || "13"),
     layer,
+    /** Показанный объект: «?object=street:129211913» */
+    object: parseObjectParam(p.get("object")),
   };
 }
 
-function writeParams(lat: number, lng: number, zoom: number, layer: MapLayer) {
+function writeParams(
+  lat: number,
+  lng: number,
+  zoom: number,
+  layer: MapLayer,
+  object: GeometryRef | null,
+) {
   const p = new URLSearchParams();
   p.set("lat", lat.toFixed(6));
   p.set("lng", lng.toFixed(6));
   p.set("zoom", zoom.toString());
   p.set("layer", layer);
+  if (object) p.set("object", formatObjectParam(object));
   window.history.replaceState(null, "", `?${p.toString()}`);
 }
 
@@ -75,15 +90,33 @@ export function initMap(containerId: string) {
   // URL sync
   map.on("moveend", () => {
     const c = map.getCenter();
-    writeParams(c.lat, c.lng, map.getZoom(), currentLayer);
+    writeParams(c.lat, c.lng, map.getZoom(), currentLayer, currentObject);
   });
   map.on("zoomend", () => {
     const c = map.getCenter();
-    writeParams(c.lat, c.lng, map.getZoom(), currentLayer);
+    writeParams(c.lat, c.lng, map.getZoom(), currentLayer, currentObject);
   });
 
   // Layer management
   let currentLayer: MapLayer = state.layer;
+  /** Объект, показанный на карте — пишется в URL как «?object=type:id»,
+   *  чтобы на карту можно было дать прямую ссылку */
+  let currentObject: GeometryRef | null = state.object;
+
+  /** Записать (или убрать) объект в URL — карту при этом не двигаем */
+  function setObjectParam(object: GeometryRef | null) {
+    if (currentObject?.type === object?.type && currentObject?.id === object?.id) {
+      return;
+    }
+    currentObject = object;
+    const c = map.getCenter();
+    writeParams(c.lat, c.lng, map.getZoom(), currentLayer, currentObject);
+  }
+
+  /** Объект из URL — для восстановления показанного объекта при заходе по ссылке */
+  function getObjectParam(): GeometryRef | null {
+    return currentObject;
+  }
 
   function setActiveLayer(layer: MapLayer) {
     if (layer === currentLayer) return;
@@ -93,7 +126,7 @@ export function initMap(containerId: string) {
     tileLayers[layer].addTo(map);
     currentLayer = layer;
     const c = map.getCenter();
-    writeParams(c.lat, c.lng, map.getZoom(), layer);
+    writeParams(c.lat, c.lng, map.getZoom(), layer, currentObject);
   }
 
   function getActiveLayer(): MapLayer {
@@ -334,84 +367,76 @@ export function initMap(containerId: string) {
     return L.latLng(pos[1], pos[0]);
   }
 
-  /** Показать найденный объект на карте по его GeoJSON-геометрии и точке-метке.
-   *  geometry рисует контуры/линии, а маркер с названием ставится в labelPoint. */
-  function showFeature(
-    geometry: GeoJSON.GeometryObject | null,
-    name?: string,
-    addr?: string | null,
-    stops?: { name: string | null; geometry: GeoJSON.GeometryObject | null; labelPoint?: GeoJSON.Point | null }[],
-    placeType?: PlaceType,
-    category?: string,
-    labelPoint?: GeoJSON.Point | null,
-  ) {
+  /** Показать объект на карте.
+   *  Данные для отрисовки приходят из ответа /osm/geometry (см. geometry.ts):
+   *  label для маркера и попапа, addr для описания, geometry для контура/линии,
+   *  labelPoint для маркера. До загрузки геометрии можно показать объект
+   *  только с маркером (geometry === null). */
+  function showFeature(object: MapObject | null) {
     featureLayer.clearLayers();
-    if (!geometry) return;
-
-    const popupContent = `<strong>${escapeHtml(name ?? "")}</strong>` +
-      (addr ? `<br>${escapeHtml(addr)}` : "");
-
-    const pt = placeType ?? "poi";
-
-    // Геометрия-точка: рисуем только маркер объекта (в labelPoint или в самой точке),
-    // без отрисовки контура — иначе получится дубль маркера.
-    if (geometry.type === "Point") {
-      const latlng = firstLatLng(labelPoint ?? geometry);
-      if (latlng) {
-        const marker = L.marker(latlng, { icon: getIconForPlace(pt, category) });
-        if (popupContent.trim()) {
-          marker.bindPopup(popupContent);
-        }
-        marker.addTo(featureLayer);
-        map.flyTo(latlng, Math.max(map.getZoom(), 16), { duration: 1.1 });
-        if (popupContent.trim()) {
-          map.openPopup(popupContent, latlng);
-        }
-      }
+    if (!object) {
+      // Объект скрыт — попап его названия тоже не должен оставаться на карте
+      map.closePopup();
       return;
     }
 
-    // Контуры/линии — рисуем геометрию (дефолтные маркеры отключены)
-    const layer = L.geoJSON(geometry, {
-      pointToLayer: (_, latlng) =>
-        L.marker(latlng, { icon: getIconForPlace(pt, category) }),
-    });
-    layer.addTo(featureLayer);
+    const popupContent = `<strong>${escapeHtml(object.label ?? object.name ?? "")}</strong>` +
+      (object.addr ? `<br>${escapeHtml(object.addr)}` : "");
+
+    const pt = object.type;
 
     // Остановки маршрута — маркеры с иконкой «stop» в label_point остановки
     let anchor: L.LatLng | null = null;
-    (stops ?? []).forEach((s) => {
+    (object.stops ?? []).forEach((s) => {
       const src = s.labelPoint ?? s.geometry;
       if (!src) return;
       const latlng = firstLatLng(src);
       if (!latlng) return;
       if (!anchor) anchor = latlng;
       const marker = L.marker(latlng, { icon: getIconForPlace("stop") });
-      if (s.name) {
-        marker.bindPopup(`<strong>${escapeHtml(s.name)}</strong>`);
+      const stopLabel = s.label ?? s.name;
+      if (stopLabel) {
+        marker.bindPopup(`<strong>${escapeHtml(stopLabel)}</strong>`);
       }
       marker.addTo(featureLayer);
     });
 
     // Маркер имени объекта — в label_point
-    const mainLatLng = labelPoint ? firstLatLng(labelPoint) : null;
+    const mainLatLng = object.labelPoint ? firstLatLng(object.labelPoint) : null;
     if (mainLatLng) {
-      const marker = L.marker(mainLatLng, { icon: getIconForPlace(pt, category) });
+      const marker = L.marker(mainLatLng, { icon: getIconForPlace(pt, object.category) });
       if (popupContent.trim()) {
         marker.bindPopup(popupContent);
       }
       marker.addTo(featureLayer);
     }
 
+    // Контуры/линии — рисуем геометрию (дефолтные маркеры отключены).
+    // Геометрию-точку не рисуем: она совпадает с label_point, иначе будет
+    // дубль маркера.
+    const geometry = object.geometry;
+    const shape = geometry && geometry.type !== "Point" ? geometry : null;
+    if (shape) {
+      L.geoJSON(shape, {
+        pointToLayer: (_, latlng) =>
+          L.marker(latlng, { icon: getIconForPlace(pt, object.category) }),
+      }).addTo(featureLayer);
+    }
+
+    const markerLatLng = mainLatLng ?? anchor;
     const bounds = featureLayer.getBounds();
-    if (bounds.isValid()) {
+    if (shape && bounds.isValid()) {
       map.flyToBounds(bounds, { padding: [40, 40], maxZoom: 18, duration: 1.1 });
+    } else if (markerLatLng) {
+      // Без контура (точка или объект, чья геометрия ещё не пришла) —
+      // приближаем к маркеру
+      map.flyTo(markerLatLng, Math.max(map.getZoom(), 16), { duration: 1.1 });
     }
 
     // Попап открываем в точке маркера / первой остановки / первой точки геометрии,
     // а не в центре границ — у протяжённых маршрутов центр может быть «в никуда»
-    const openAt = mainLatLng ?? anchor ?? firstLatLng(geometry) ?? bounds.getCenter();
-    if (popupContent.trim()) {
+    const openAt = mainLatLng ?? anchor ?? (geometry ? firstLatLng(geometry) : null);
+    if (popupContent.trim() && openAt) {
       map.openPopup(popupContent, openAt);
     }
   }
@@ -422,6 +447,8 @@ export function initMap(containerId: string) {
     getActiveLayer,
     flyToTavda,
     showFeature,
+    setObjectParam,
+    getObjectParam,
     showUserMarker,
     hideUserMarker,
     isUserMarkerVisible,

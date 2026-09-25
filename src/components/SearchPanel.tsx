@@ -86,28 +86,32 @@ export default function SearchPanel({ onSelect, onSearchStart }: SearchPanelProp
 
       {searchResult && searchResult.places.length > 0 && (
         <ul className="search-results">
-          {searchResult.places.map((place) => (
-            <li key={place.id}>
-              <button
-                type="button"
-                className="search-result-item"
-                onClick={() => onSelect(place)}
-                disabled={!place.geometry}
-                title={place.geometry ? "Показать на карте" : "Нет геометрии"}
-              >
-                <span
-                  className={getMarkerClass(place.type, place.category)}
-                  dangerouslySetInnerHTML={{ __html: getMarkerSvg(place.type, place.category) }}
-                />
-                <span className="search-result-text">
-                  <span className="search-result-name">{place.name}</span>
-                  {place.addr && (
-                    <span className="search-result-addr">{place.addr}</span>
-                  )}
-                </span>
-              </button>
-            </li>
-          ))}
+          {searchResult.places.map((place) => {
+            // В ответе поиска нет геометрии, но маркер по label_point доступен сразу
+            const canShow = !!place.labelPoint;
+            return (
+              <li key={place.id}>
+                <button
+                  type="button"
+                  className="search-result-item"
+                  onClick={() => onSelect(place)}
+                  disabled={!canShow}
+                  title={canShow ? "Показать на карте" : "Нет данных для отображения"}
+                >
+                  <span
+                    className={getMarkerClass(place.type, place.category)}
+                    dangerouslySetInnerHTML={{ __html: getMarkerSvg(place.type, place.category) }}
+                  />
+                  <span className="search-result-text">
+                    <span className="search-result-name">{place.name}</span>
+                    {place.addr && (
+                      <span className="search-result-addr">{place.addr}</span>
+                    )}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
