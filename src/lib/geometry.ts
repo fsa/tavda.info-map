@@ -55,7 +55,17 @@ interface GeometryResponseItem extends GeometryRef {
   from?: string | null;
   to?: string | null;
   operator?: string | null;
+  /** Маршрут: остановки следования по порядку (только у маршрута) */
+  stops?: RouteStopResponse[];
   geometry: GisGeometry | null;
+  label_point?: GisPoint | null;
+}
+
+/** Остановка в составе маршрута в ответе `POST /osm/geometry` */
+interface RouteStopResponse {
+  label?: string | null;
+  name?: string | null;
+  kind?: string | null;
   label_point?: GisPoint | null;
 }
 
@@ -207,6 +217,19 @@ function toMapObject(item: GeometryResponseItem): MapObject {
     ...(item.type === "poi" && item.category
       ? { category: item.category }
       : {}),
+    // Остановки маршрута: геометрии в ответе нет, маркер ставится по
+    // label_point, подпись берётся из label (у безымянной — из ref)
+    ...(item.stops && item.stops.length > 0
+      ? {
+          stops: item.stops.map((stop) => ({
+            label: stop.label ?? stop.name ?? null,
+            name: stop.name ?? null,
+            kind: stop.kind ?? null,
+            geometry: null,
+            labelPoint: stop.label_point ?? null,
+          })),
+        }
+      : {}),
   };
 }
 
@@ -258,9 +281,11 @@ export async function loadPlaceObject(
       place.type === "stop"
         ? (place.addr ?? objectAddr(item))
         : objectAddr(item),
-    stops:
-      place.type === "route" && stopRefs.length > 0
-        ? place.stops.map((stop) => {
+    // Остановки маршрута — из результата поиска (вместе с их геометрией).
+    // Если поиск остановок не дал, остаются те, что пришли в ответе геометрии
+    ...(place.type === "route" && stopRefs.length > 0
+      ? {
+          stops: place.stops.map((stop) => {
             const stopItem = loaded.get(key(stop.ref));
             return {
               label:
@@ -270,7 +295,8 @@ export async function loadPlaceObject(
               geometry: stopItem?.geometry ?? null,
               labelPoint: stopItem?.label_point ?? stop.labelPoint ?? null,
             };
-          })
-        : undefined,
+          }),
+        }
+      : {}),
   };
 }
