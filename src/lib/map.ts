@@ -5,6 +5,15 @@ import markerIcon from "leaflet/dist/images/marker-icon.png?url";
 import markerShadow from "leaflet/dist/images/marker-shadow.png?url";
 import { LAYERS, type LayerConfig } from "./layers";
 import { geoService, type GeoState } from "./geolocation";
+import { escapeHtml } from "./html";
+import {
+  createDraftController,
+  createMessageLayer,
+  type DraftController,
+  type MessageLayer,
+  type MessagePoint,
+} from "./messageLayer";
+import type { MapMessage } from "./messages";
 import { getIconKey, getMarkerClass, getMarkerColor, getMarkerSvg } from "./icons";
 import {
   formatObjectParam,
@@ -131,6 +140,12 @@ export function initMap(containerId: string) {
 
   function getActiveLayer(): MapLayer {
     return currentLayer;
+  }
+
+  /** Центр карты — от него ставим метку нового сообщения, если геолокации нет */
+  function getCenter(): MessagePoint {
+    const c = map.getCenter();
+    return { lat: c.lat, lon: c.lng };
   }
 
   // --- User location marker ---
@@ -310,15 +325,36 @@ export function initMap(containerId: string) {
     map.flyTo([58.0419, 65.273235], 13, { duration: 1.5 });
   }
 
-  // --- Результаты поиска ---
+  // --- Сообщения посетителей ---
 
-  const escapeHtml = (s: string): string =>
-    s
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#39;");
+  // Сообщения видит только их автор: список приходит из React, а не с карты
+  const messageLayer: MessageLayer = createMessageLayer(map);
+  const draft: DraftController = createDraftController(map);
+
+  function showMessages(list: MapMessage[], selectedId: string | null) {
+    messageLayer.setMessages(list);
+    messageLayer.setSelected(selectedId);
+  }
+
+  function setMessageSelectHandler(handler: Parameters<MessageLayer["setSelectHandler"]>[0]) {
+    messageLayer.setSelectHandler(handler);
+  }
+
+  /** Показать метку выбора точки и включить режим постановки записи */
+  function startPlacing(
+    lat: number,
+    lon: number,
+    onMove: Parameters<DraftController["start"]>[2],
+  ) {
+    draft.start(lat, lon, onMove);
+  }
+
+  /** Убрать метку выбора точки */
+  function stopPlacing() {
+    draft.stop();
+  }
+
+  // --- Результаты поиска ---
 
   /** Слой с отображаемыми объектами из GeoJSON */
   const featureLayer = L.featureGroup().addTo(map);
@@ -463,6 +499,11 @@ export function initMap(containerId: string) {
   return {
     map,
     setActiveLayer,
+    getCenter,
+    showMessages,
+    setMessageSelectHandler,
+    startPlacing,
+    stopPlacing,
     getActiveLayer,
     flyToTavda,
     showFeature,

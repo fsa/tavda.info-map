@@ -162,3 +162,11 @@ export function getMarkerColor(type: PlaceType, category?: string): string {
 export function getMarkerSvg(type: PlaceType, category?: string): string {
   return SVG[getIconKey(type, category)] ?? SVG.poi;
 }
+
+// ─── Сообщения посетителей и метка в режиме постановки ────────────────────
+
+/** Реплика — маркер сообщения на карте */
+export const MESSAGE_SVG = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4a2 2 0 0 0-2 2v18l4-4h14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zM7 9h10v2H7V9zm6 5H7v-2h6v2zm4-6H7V6h10v2z"/></svg>`;
+
+/** Прицел — метка, которую посетитель двигает, выбирая точку */
+export const DRAFT_SVG = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M11 2h2v3.06a7 7 0 0 1 5.94 5.94H22v2h-3.06A7 7 0 0 1 13 18.94V22h-2v-3.06A7 7 0 0 1 5.06 13H2v-2h3.06A7 7 0 0 1 11 5.06V2Zm1 5a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6Z"/></svg>`;

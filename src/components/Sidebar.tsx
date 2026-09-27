@@ -7,7 +7,18 @@ import { LAYERS } from "../lib/layers";
 import { toPreviewObject, type SearchPlace } from "../lib/search";
 import { loadObjectByRef, loadPlaceObject, type MapObject } from "../lib/geometry";
 import { geoService } from "../lib/geolocation";
+import {
+  createMapMessage,
+  loadOwnMessages,
+  readOwnIds,
+  rememberOwnId,
+  type MapMessage,
+  type NewMapMessage,
+} from "../lib/messages";
+import { toast } from "../lib/toast";
 import SearchPanel from "./SearchPanel";
+import MessageSection from "./MessageSection";
+import MessageComposer from "./MessageComposer";
 
 export default function Sidebar() {
   const [open, setOpen] = useState(false);
@@ -29,6 +40,12 @@ export default function Sidebar() {
   const [showMarker, setShowMarker] = useState(false);
   const [tracking, setTracking] = useState(false);
   const [followMode, setFollowMode] = useState(false);
+
+  // Свои сообщения на карте: список приходит с сервера по идентификаторам,
+  // которые лежат в localStorage этого браузера
+  const [messages, setMessages] = useState<MapMessage[]>([]);
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
+  const [composerOpen, setComposerOpen] = useState(false);
 
   // После гидратации синхронизируемся с сервисом
   useEffect(() => {
@@ -67,27 +84,66 @@ export default function Sidebar() {
     });
   };
 
+  /** Забрать свои сообщения: сервер отдаёт только то, что перечислили в ids */
+  const loadMessages = () => {
+    const ids = readOwnIds();
+
+    if (ids.length === 0) {
+      setMessages([]);
+
+      return;
+    }
+
+    loadOwnMessages(ids)
+      .then((list) => setMessages(list))
+      .catch(() => toast.error("Не удалось загрузить ваши сообщения"));
+  };
+
+  const attachToMap = (inst: MapInstance) => {
+    mapRef.current = inst;
+    setMapInstance(inst);
+    setActiveLayerState(inst.getActiveLayer());
+    inst.setMessageSelectHandler((id) => setSelectedMessageId(id));
+    restoreFromUrl(inst);
+    loadMessages();
+  };
+
   useEffect(() => {
     // Check if map already initialized (script runs before React hydrates)
     const existing = (window as any).__map as MapInstance | undefined;
     if (existing) {
-      mapRef.current = existing;
-      setMapInstance(existing);
-      setActiveLayerState(existing.getActiveLayer());
-      restoreFromUrl(existing);
+      attachToMap(existing);
     } else {
       // Otherwise wait for the event
       const handler = (e: Event) => {
-        const inst = (e as CustomEvent).detail as MapInstance;
-        mapRef.current = inst;
-        setMapInstance(inst);
-        setActiveLayerState(inst.getActiveLayer());
-        restoreFromUrl(inst);
+        attachToMap((e as CustomEvent).detail as MapInstance);
       };
       window.addEventListener("map:ready", handler);
       return () => window.removeEventListener("map:ready", handler);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Раз в списке или в выборе что-то изменилось — перерисовываем маркеры
+  useEffect(() => {
+    mapInstance?.showMessages(messages, selectedMessageId);
+  }, [mapInstance, messages, selectedMessageId]);
+
+  /** Выбрать запись в списке: подсветить маркер и показать его попап */
+  const selectMessage = (id: string) => {
+    setSelectedMessageId(id === selectedMessageId ? null : id);
+  };
+
+  /** Отправить запись и сразу показать её на карте */
+  const sendMessage = async (message: NewMapMessage) => {
+    const created = await createMapMessage(message);
+    // Идентификатор запоминаем в браузере: по нему запись будет видна
+    // при следующем заходе, а по ссылке её не увидит никто
+    rememberOwnId(created.id);
+    setMessages((previous) => [created, ...previous]);
+    setSelectedMessageId(created.id);
+    setComposerOpen(false);
+    toast.success("Сообщение сохранено");
+  };
 
   const handleLayerChange = (layer: MapLayer) => {
     setActiveLayerState(layer);
@@ -148,7 +204,8 @@ export default function Sidebar() {
         </button>
       )}
 
-      {selected && (wide || !open) && (
+      {/* Форма сообщения открыта — панель объекта ей мешала бы */}
+      {selected && !composerOpen && (wide || !open) && (
         <div className="selected-object-bar">
           <div className="selected-object-info">
             <span className="selected-object-name">
@@ -270,6 +327,20 @@ export default function Sidebar() {
             }}
           />
 
+          <MessageSection
+            messages={messages}
+            selectedId={selectedMessageId}
+            onSelect={selectMessage}
+            onAdd={() => {
+              setComposerOpen(true);
+              // На мобильных меню перекрывает карту — сворачиваем его,
+              // иначе метку выбора точки не видно и не поставить
+              if (window.matchMedia("(max-width: 767px)").matches) {
+                handleClose();
+              }
+            }}
+          />
+
           <div className="sidebar-version">
             {import.meta.env.PROD
               ? `${__GIT_HASH__} ${__BUILD_TIME__.slice(0, 10)}`
@@ -277,6 +348,14 @@ export default function Sidebar() {
           </div>
         </nav>
       </aside>
+
+      {composerOpen && mapInstance && (
+        <MessageComposer
+          map={mapInstance}
+          onSubmit={sendMessage}
+          onClose={() => setComposerOpen(false)}
+        />
+      )}
     </>
   );
 }

@@ -28,12 +28,38 @@ export const apiClient = axios.create({
   },
 });
 
+/**
+ * Базовый URL сайта с PHP-бэкендом (Symfony).
+ *
+ * Локально он отличается от PUBLIC_API_BASE: GIS-сервис написан на Go и
+ * поднят на своём порту, а сообщения с карты принимает Symfony. Поэтому
+ * адрес задаётся отдельно, а без него берётся адрес GIS — на бою они
+ * совпадают, локально различаются.
+ */
+const SITE_BASE_URL = (
+  (import.meta.env.PUBLIC_SITE_API_BASE as string | undefined) ?? BASE_URL
+).replace(/\/+$/, "");
+
+/** Инстанс axios для сайта (Symfony) */
+export const siteApiClient = axios.create({
+  baseURL: SITE_BASE_URL,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
 /** Адреса эндпоинтов API */
 export const API = {
   /** Нечёткий поиск: список объектов с идентификаторами и label_point (без геометрии) */
   search: "osm/search",
   /** Геометрия (GeoJSON) по идентификаторам из поиска */
   geometry: "osm/geometry",
+} as const;
+
+/** Адреса эндпоинтов сайта (Symfony) */
+export const SITE_API = {
+  /** Сообщения посетителей: POST — создать, GET — забрать свои по ids */
+  mapMessages: "api/map/messages",
 } as const;
 
 // --- Точка расширения: интерцепторы ---
