@@ -51,6 +51,8 @@ interface GeometryResponseItem extends GeometryRef {
   /** Остановка: вид, все виды (у группы stop_area) и код */
   kind?: string | null;
   kinds?: string[] | null;
+  /** Подпись видов по-русски из API: «остановка», «вокзал, платформа…» */
+  kinds_label?: string | null;
   ref?: string | null;
   /** Маршрут: начало, конец, перевозчик */
   from?: string | null;
@@ -169,31 +171,25 @@ export async function fetchGeometry(
   }
 }
 
-/** Вид остановки → подпись для описания (в API значения английские) */
-const STOP_KIND_LABELS: Record<string, string> = {
-  bus_stop: "остановка",
-  platform: "платформа",
-  stop_position: "посадка",
-  station: "вокзал",
-  halt: "посёлок",
-  stop_area: "зона остановки",
-};
-
 /**
  * Описание остановки: все её виды, а не только главный.
  *
- * У логической остановки из связи `stop_area` kind — самый значимый вид
- * (вокзал), но в описании полезно перечислить состав: «вокзал, платформы,
- * посадка». Одиночная остановка — это один вид.
+ * Подпись видов по-русски приходит из API (`kinds_label`, собирается в
+ * `config/stops.sql`): у логической остановки из связи `stop_area` kind —
+ * самый значимый вид (вокзал), но в описании полезно перечислить состав:
+ * «вокзал, платформа, точка посадки». Своего словаря нет намеренно — иначе
+ * он разойдётся с серверным (и уже разошёлся: `halt` тут назывался
+ * «посёлком», хотя это железнодорожные платформы).
  */
 function stopKindsLabel(item: GeometryResponseItem): string | null {
+  if (item.kinds_label) return item.kinds_label;
+  // Старый API без kinds_label: показываем английские виды как есть
   const kinds = item.kinds?.length
     ? item.kinds
     : item.kind
       ? [item.kind]
       : [];
-  const labels = kinds.map((kind) => STOP_KIND_LABELS[kind] ?? kind);
-  return labels.length > 0 ? labels.join(", ") : null;
+  return kinds.length > 0 ? kinds.join(", ") : null;
 }
 
 /** Вторая строка описания — собирается из атрибутов объекта */

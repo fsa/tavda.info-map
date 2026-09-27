@@ -133,6 +133,8 @@ interface SearchStop {
   kind: string;
   /** Все виды остановки; у группы из связи stop_area — состав (вокзал, платформы…) */
   kinds?: string[];
+  /** Подпись видов по-русски из API: «остановка», «вокзал, платформа…» */
+  kinds_label?: string;
   name: string | null;
   /** Адрес из тегов OSM — есть у единиц платформ */
   street?: string;
