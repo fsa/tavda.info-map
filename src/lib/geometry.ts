@@ -48,8 +48,9 @@ interface GeometryResponseItem extends GeometryRef {
   /** POI: тип объекта и русская подпись — выбор иконки */
   category?: string | null;
   category_label?: string | null;
-  /** Остановка: вид и код */
+  /** Остановка: вид, все виды (у группы stop_area) и код */
   kind?: string | null;
+  kinds?: string[] | null;
   ref?: string | null;
   /** Маршрут: начало, конец, перевозчик */
   from?: string | null;
@@ -173,7 +174,27 @@ const STOP_KIND_LABELS: Record<string, string> = {
   bus_stop: "остановка",
   platform: "платформа",
   stop_position: "посадка",
+  station: "вокзал",
+  halt: "посёлок",
+  stop_area: "зона остановки",
 };
+
+/**
+ * Описание остановки: все её виды, а не только главный.
+ *
+ * У логической остановки из связи `stop_area` kind — самый значимый вид
+ * (вокзал), но в описании полезно перечислить состав: «вокзал, платформы,
+ * посадка». Одиночная остановка — это один вид.
+ */
+function stopKindsLabel(item: GeometryResponseItem): string | null {
+  const kinds = item.kinds?.length
+    ? item.kinds
+    : item.kind
+      ? [item.kind]
+      : [];
+  const labels = kinds.map((kind) => STOP_KIND_LABELS[kind] ?? kind);
+  return labels.length > 0 ? labels.join(", ") : null;
+}
 
 /** Вторая строка описания — собирается из атрибутов объекта */
 function objectAddr(item: GeometryResponseItem): string | null {
@@ -186,10 +207,7 @@ function objectAddr(item: GeometryResponseItem): string | null {
       );
     case "stop":
       return (
-        [
-          item.ref || (item.kind ? STOP_KIND_LABELS[item.kind] : null),
-          streetAddress(item),
-        ]
+        [item.ref || stopKindsLabel(item), streetAddress(item)]
           .filter(Boolean)
           .join(", ") || null
       );

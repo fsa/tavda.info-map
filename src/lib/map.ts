@@ -5,7 +5,7 @@ import markerIcon from "leaflet/dist/images/marker-icon.png?url";
 import markerShadow from "leaflet/dist/images/marker-shadow.png?url";
 import { LAYERS, type LayerConfig } from "./layers";
 import { geoService, type GeoState } from "./geolocation";
-import { getIconKey, getMarkerClass, getMarkerSvg } from "./icons";
+import { getIconKey, getMarkerClass, getMarkerColor, getMarkerSvg } from "./icons";
 import {
   formatObjectParam,
   parseObjectParam,
@@ -341,8 +341,17 @@ export function initMap(containerId: string) {
     return icon;
   }
 
-  /** Первая точка GeoJSON-геометрии любого типа → LatLng */
+  /** Первая точка GeoJSON-геометрии любого типа → LatLng.
+   *  GeometryCollection (составная остановка из связи stop_area) раскрываем
+   *  рекурсивно: у коллекции нет coordinates, только geometries. */
   function firstLatLng(geometry: GeoJSON.GeometryObject): L.LatLng | null {
+    if (geometry.type === "GeometryCollection") {
+      for (const part of geometry.geometries) {
+        const latlng = firstLatLng(part);
+        if (latlng) return latlng;
+      }
+      return null;
+    }
     const c = (geometry as unknown as { coordinates?: unknown }).coordinates as any;
     let pos: unknown;
     switch (geometry.type) {
@@ -417,7 +426,17 @@ export function initMap(containerId: string) {
     const geometry = object.geometry;
     const shape = geometry && geometry.type !== "Point" ? geometry : null;
     if (shape) {
+      // Цвет контура — как у маркера объекта: иначе Leaflet рисует всё
+      // дефолтным синим, и остановка не отличается от маршрута или улицы.
+      const color = getMarkerColor(pt, object.category);
       L.geoJSON(shape, {
+        style: {
+          color,
+          weight: 3,
+          opacity: 0.8,
+          fillColor: color,
+          fillOpacity: 0.15,
+        },
         pointToLayer: (_, latlng) =>
           L.marker(latlng, { icon: getIconForPlace(pt, object.category) }),
       }).addTo(featureLayer);

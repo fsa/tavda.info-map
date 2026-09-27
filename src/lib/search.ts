@@ -24,10 +24,12 @@ export type GisPoint = { type: "Point"; coordinates: GisPosition };
 /** Геометрии, которые возвращает бекенд (GeoJSON) */
 export type GisGeometry =
   | GisPoint
+  | { type: "MultiPoint"; coordinates: GisPosition[] }
   | { type: "LineString"; coordinates: GisPosition[] }
   | { type: "MultiLineString"; coordinates: GisPosition[][] }
   | { type: "Polygon"; coordinates: GisPosition[][] }
-  | { type: "MultiPolygon"; coordinates: GisPosition[][][] };
+  | { type: "MultiPolygon"; coordinates: GisPosition[][][] }
+  | { type: "GeometryCollection"; geometries: GisGeometry[] };
 
 /** Остановка маршрута в результатах поиска */
 export interface SearchPlaceStop {
@@ -129,6 +131,8 @@ interface SearchStop {
   osm_type: string;
   osm_id: number;
   kind: string;
+  /** Все виды остановки; у группы из связи stop_area — состав (вокзал, платформы…) */
+  kinds?: string[];
   name: string | null;
   /** Адрес из тегов OSM — есть у единиц платформ */
   street?: string;
